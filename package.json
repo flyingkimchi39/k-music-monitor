@@ -1,0 +1,14 @@
+{
+  "name": "k-music-monitor",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "echo build",
+    "start": "echo start",
+    "dev": "echo dev"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "cheerio": "^1.0.0"
+  }
+}

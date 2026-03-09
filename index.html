@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-Music Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0a0f1e 0%, #0f0f23 100%);
+            color: #e0e0e0;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header-title {
+            font-size: 32px;
+            font-weight: 900;
+            color: #667eea;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .header-icon {
+            font-size: 24px;
+            margin-right: 8px;
+        }
+
+        .header-subtitle {
+            color: #999;
+            font-size: 14px;
+            font-weight: 400;
+            letter-spacing: 0.02em;
+        }
+
+        .disclaimer-popup {
+            display: flex;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.95);
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(4px);
+        }
+
+        .disclaimer-popup.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .disclaimer-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            text-align: center;
+            animation: slideIn 0.3s ease;
+            position: relative;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .disclaimer-content h2 {
+            margin: 0 0 20px 0;
+            color: #667eea;
+            font-size: 24px;
+            font-weight: 900;
+        }
+
+        .disclaimer-content p {
+            color: #ccc;
+            line-height: 1.8;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+
+        .disclaimer-highlight {
+            background: rgba(255, 193, 7, 0.1);
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+            border-radius: 4px;
+            color: #ffc107;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .disclaimer-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 30px;
+            justify-content: center;
+        }
+
+        .btn-agree {
+            flex: 1;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-agree:hover {
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-disagree {
+            flex: 1;
+            padding: 12px 24px;
+            background: rgba(220, 53, 69, 0.2);
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-disagree:hover {
+            background: rgba(220, 53, 69, 0.3);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+        }
+
+        .btn-close-popup {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-close-popup:hover {
+            background: rgba(102, 126, 234, 0.2);
+            border-color: #667eea;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.04));
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: left;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .stat-card:hover {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.12), rgba(118, 75, 162, 0.08));
+            border-color: rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .stat-label {
+            color: #999;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            color: #667eea;
+            font-size: 24px;
+            font-weight: 900;
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+        }
+
+        .stat-desc {
+            color: #666;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1.4;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #667eea;
+            letter-spacing: 0.05em;
+        }
+
+        .section-icon {
+            font-size: 18px;
+        }
+
+        .top-10-container {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.04));
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 40px;
+        }
+
+        .top-10-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .top-10-item {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.12), rgba(118, 75, 162, 0.08));
+            border: 1px solid rgba(102, 126, 234, 0.25);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .top-10-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #667eea, transparent);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .top-10-item:hover {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.18), rgba(118, 75, 162, 0.12));
+            border-color: rgba(102, 126, 234, 0.4);
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
+            transform: translateY(-4px);
+        }
+
+        .top-10-item:hover::before {
+            opacity: 1;
+        }
+
+        .top-10-rank {
+            color: #764ba2;
+            font-size: 13px;
+            font-weight: 900;
+            margin-bottom: 8px;
+            letter-spacing: 0.05em;
+            font-family: 'Courier New', monospace;
+        }
+
+        .top-10-title {
+            color: #667eea;
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            letter-spacing: -0.3px;
+            line-height: 1.4;
+        }
+
+        .top-10-desc {
+            color: #888;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1.4;
+        }
+
+        .rest-container {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.04));
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 40px;
+        }
+
+        .rest-label {
+            color: #666;
+            font-size: 12px;
+            font-weight: 400;
+            margin-bottom: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .rest-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .rest-item {
+            background: rgba(102, 126, 234, 0.05);
+            border: 1px solid rgba(102, 126, 234, 0.15);
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 11px;
+            color: #aaa;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rest-item:hover {
+            background: rgba(102, 126, 234, 0.1);
+            border-color: rgba(102, 126, 234, 0.3);
+            color: #ccc;
+        }
+
+        .rest-item-rank {
+            color: #764ba2;
+            font-weight: 700;
+            margin-right: 4px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .chart-container {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.04));
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 8px;
+            padding: 24px;
+            min-height: 320px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            transition: all 0.2s ease;
+        }
+
+        .chart-container:hover {
+            border-color: rgba(102, 126, 234, 0.4);
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.1);
+        }
+
+        .chart-title {
+            color: #667eea;
+            font-weight: 700;
+            font-size: 13px;
+            margin-bottom: 20px;
+            letter-spacing: 0.05em;
+        }
+
+        .chart-placeholder {
+            width: 100%;
+            height: 240px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.03));
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .table-container {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.04));
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 8px;
+            padding: 24px;
+            overflow-x: auto;
+            margin-bottom: 40px;
+            max-height: 800px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 14px 16px;
+            text-align: left;
+            color: #667eea;
+            font-weight: 700;
+            font-size: 12px;
+            letter-spacing: 0.05em;
+            border-bottom: 2px solid rgba(102, 126, 234, 0.2);
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+            color: #e0e0e0;
+            font-size: 13px;
+        }
+
+        tr:hover {
+            background: rgba(102, 126, 234, 0.08);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .rank-col {
+            color: #764ba2;
+            font-weight: 900;
+            font-family: 'Courier New', monospace;
+            width: 40px;
+        }
+
+        .status-normal {
+            color: #51cf66;
+            font-weight: 600;
+        }
+
+        .status-warning {
+            color: #ffc107;
+            font-weight: 600;
+        }
+
+        .status-danger {
+            color: #ff6b6b;
+            font-weight: 600;
+        }
+
+        .table-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .table-container::-webkit-scrollbar-track {
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .table-container::-webkit-scrollbar-thumb {
+            background: rgba(102, 126, 234, 0.3);
+            border-radius: 4px;
+        }
+
+        .table-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(102, 126, 234, 0.5);
+        }
+
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 24px 16px;
+            }
+
+            .header-title {
+                font-size: 24px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .top-10-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .disclaimer-content {
+                padding: 32px 24px;
+                max-width: 90vw;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="disclaimer-popup" id="disclaimerPopup">
+        <div class="disclaimer-content">
+            <button class="btn-close-popup" onclick="acceptDisclaimer()">✕</button>
+            
+            <h2>⚖️ 법적 고지사항</h2>
+            <p>K-Music Monitor 서비스 이용 약관</p>
+            
+            <div class="disclaimer-highlight">
+                <strong>📌 중요 사항:</strong><br>
+                ✓ YouTube 공식 API 기반 분석<br>
+                ✓ 교육 및 통계 목적만 제공<br>
+                ✓ 개인 학습용도 허용<br>
+                ✗ 상업적 무단 사용 금지
+            </div>
+
+            <p>본 서비스를 이용함으로써 위 사항에 동의하는 것으로 간주됩니다.</p>
+
+            <div class="disclaimer-buttons">
+                <button class="btn-agree" onclick="acceptDisclaimer()">동의</button>
+                <button class="btn-disagree" onclick="rejectDisclaimer()">거절</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="mainContent" style="display: none;">
+        <div class="container">
+            <div class="header">
+                <h1 class="header-title"><span class="header-icon">🎵</span>K-Music Monitor</h1>
+                <p class="header-subtitle">YouTube 및 Melon 음악 데이터 실시간 분석 대시보드</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">YouTube 1위</div>
+                    <div class="stat-value" id="stat1">로딩중...</div>
+                    <div class="stat-desc" id="stat1-desc">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">🎵 음악 1위</div>
+                    <div class="stat-value" id="stat2">로딩중...</div>
+                    <div class="stat-desc" id="stat2-desc">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">⌚ 위험 곡</div>
+                    <div class="stat-value" id="stat3">0</div>
+                    <div class="stat-desc" id="stat3-desc">의심 영역</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">⏱️ 업데이트</div>
+                    <div class="stat-value" id="stat4">---</div>
+                    <div class="stat-desc" id="stat4-desc">실시간 종계</div>
+                </div>
+            </div>
+
+            <div class="top-10-container">
+                <div class="section-header">
+                    <span class="section-icon">🔥</span>
+                    Top 10 위험곡 (사제기 의심)
+                </div>
+                <div class="top-10-grid" id="top10Grid">
+                    <div class="loading">로딩중...</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <div class="chart-title">📊 YouTube Top 10 조회수</div>
+                    <div class="chart-placeholder">
+                        <svg width="240" height="200" viewBox="0 0 240 200">
+                            <rect x="20" y="40" width="20" height="120" fill="#667eea" rx="3"/>
+                            <rect x="50" y="80" width="20" height="80" fill="#667eea" rx="3"/>
+                            <rect x="80" y="110" width="20" height="50" fill="#667eea" rx="3"/>
+                            <rect x="110" y="130" width="20" height="30" fill="#667eea" rx="3"/>
+                            <rect x="140" y="150" width="20" height="10" fill="#667eea" rx="3"/>
+                            <line x1="10" y1="160" x2="170" y2="160" stroke="#666" stroke-width="1"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-title">📈 댓글/좋아요 비율</div>
+                    <div class="chart-placeholder">
+                        <svg width="240" height="200" viewBox="0 0 240 200">
+                            <path d="M 20 150 Q 60 100, 100 80 T 180 110" stroke="#667eea" stroke-width="2" fill="none"/>
+                            <path d="M 20 160 Q 60 140, 100 130 T 180 140" stroke="#764ba2" stroke-width="2" fill="none"/>
+                            <circle cx="20" cy="150" r="3" fill="#667eea"/>
+                            <circle cx="100" cy="80" r="3" fill="#667eea"/>
+                            <circle cx="180" cy="110" r="3" fill="#667eea"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-title">🥧 위험도 분포</div>
+                    <div class="chart-placeholder">
+                        <svg width="200" height="200" viewBox="0 0 200 200">
+                            <circle cx="100" cy="100" r="70" fill="none" stroke="#667eea" stroke-width="15" stroke-dasharray="110 440" transform="rotate(-90 100 100)"/>
+                            <circle cx="100" cy="100" r="70" fill="none" stroke="#764ba2" stroke-width="15" stroke-dasharray="165 440" stroke-dashoffset="-110" transform="rotate(-90 100 100)"/>
+                            <circle cx="100" cy="100" r="70" fill="none" stroke="#51cf66" stroke-width="15" stroke-dasharray="165 440" stroke-dashoffset="-275" transform="rotate(-90 100 100)"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rest-container">
+                <div class="section-header">
+                    <span class="section-icon">📋</span>
+                    Rest of 90 Songs
+                </div>
+                <div class="rest-label">위험도 낮은 곡들 (11-100위)</div>
+                <div class="rest-items" id="restItems">
+                    <div class="loading">로딩중...</div>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-header">
+                    <span class="section-icon">🎼</span>
+                    Top 100 곡 현황
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>순위</th>
+                                <th>곡명</th>
+                                <th>아티스트</th>
+                                <th>조회수</th>
+                                <th>위험도</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr><td colspan="6" class="loading">데이터 로딩중...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let TOP_100 = [];
+
+        async function fetchData() {
+            try {
+                const youtubeRes = await fetch('/api/youtube');
+                const youtubeData = youtubeRes.ok ? await youtubeRes.json() : { chart: [] };
+                
+                const melonRes = await fetch('/api/melon');
+                const melonData = melonRes.ok ? await melonRes.json() : { chart: [] };
+
+                let youtubeChart = youtubeData.chart || [];
+                let melonChart = melonData.chart || [];
+
+                if (youtubeChart.length === 0 || melonChart.length === 0) {
+                    generateDummyData();
+                } else {
+                    TOP_100 = [
+                        ...youtubeChart.slice(0, 50).map((item, i) => ({
+                            rank: i + 1,
+                            title: item.title || '제목 없음',
+                            artist: item.artist || item.channel || '-',
+                            views: Math.floor(item.views / 1000) + 'K',
+                            risk: Math.min(100, item.suspicionScore || 0),
+                            status: item.riskLevel || '정상',
+                            imageUrl: item.thumbnail
+                        })),
+                        ...melonChart.slice(0, 50).map((item, i) => ({
+                            rank: i + 51,
+                            title: item.title || '제목 없음',
+                            artist: item.artist || '-',
+                            views: item.views || '0K',
+                            risk: Math.min(100, item.suspicionScore || 0),
+                            status: item.riskLevel || '정상',
+                            imageUrl: item.thumbnail || ''
+                        }))
+                    ];
+
+                    updateStats();
+                    generateTop10();
+                    generateRest90();
+                    generateTable();
+                }
+            } catch (error) {
+                console.error('API 오류:', error);
+                generateDummyData();
+            }
+        }
+
+        function generateDummyData() {
+            const songNames = [
+                { title: 'BANG BANG', artist: 'IVE' },
+                { title: 'BLACKHOLE', artist: 'IVE' },
+                { title: '신곡 A', artist: 'Artist B' },
+                { title: '신곡 C', artist: 'Artist D' },
+                { title: '신곡 E', artist: 'Artist F' },
+                { title: '신곡 G', artist: 'Artist H' },
+                { title: '신곡 I', artist: 'Artist J' },
+                { title: '신곡 K', artist: 'Artist L' },
+                { title: '신곡 M', artist: 'Artist N' },
+                { title: '신곡 O', artist: 'Artist P' }
+            ];
+
+            TOP_100 = [];
+            for (let i = 1; i <= 100; i++) {
+                const risk = i <= 10 ? (i === 1 || i === 2 ? 55 : Math.floor(Math.random() * 40 + 5)) : Math.floor(Math.random() * 60 + 1);
+                TOP_100.push({
+                    rank: i,
+                    title: i <= 10 ? songNames[i - 1].title : `곡 ${i}`,
+                    artist: i <= 10 ? songNames[i - 1].artist : `아티스트 ${String.fromCharCode(64 + (i % 26) + 1)}`,
+                    views: Math.floor(Math.random() * 9000 + 100) + 'K',
+                    risk: risk,
+                    status: risk > 50 ? '의심' : risk > 30 ? '주의' : '정상',
+                    imageUrl: ''
+                });
+            }
+
+            updateStats();
+            generateTop10();
+            generateRest90();
+            generateTable();
+        }
+
+        function updateStats() {
+            if (TOP_100.length > 0) {
+                document.getElementById('stat1').textContent = TOP_100[0].title;
+                document.getElementById('stat1-desc').textContent = TOP_100[0].artist;
+                document.getElementById('stat2').textContent = TOP_100[1]?.title || '-';
+                document.getElementById('stat2-desc').textContent = TOP_100[1]?.artist || '-';
+                
+                const dangerCount = TOP_100.filter(s => s.risk > 50).length;
+                document.getElementById('stat3').textContent = dangerCount;
+                
+                const now = new Date();
+                document.getElementById('stat4').textContent = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                document.getElementById('stat4-desc').textContent = now.toLocaleDateString('ko-KR');
+            }
+        }
+
+        function generateTop10() {
+            const grid = document.getElementById('top10Grid');
+            grid.innerHTML = TOP_100.slice(0, 10).map(song => `
+                <div class="top-10-item">
+                    <div class="top-10-rank">${song.rank}.</div>
+                    <div class="top-10-title">${song.title}</div>
+                    <div class="top-10-desc">${song.artist}</div>
+                </div>
+            `).join('');
+        }
+
+        function generateRest90() {
+            const restItems = document.getElementById('restItems');
+            restItems.innerHTML = TOP_100.slice(10, 100).map(song => `
+                <div class="rest-item"><span class="rest-item-rank">${song.rank}.</span>${song.title}</div>
+            `).join('');
+        }
+
+        function generateTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = TOP_100.map(song => {
+                const riskClass = song.risk > 50 ? 'status-danger' : song.risk > 30 ? 'status-warning' : 'status-normal';
+                const statusIcon = song.status === '정상' ? '✓' : song.status === '주의' ? '⚡' : '⚠️';
+
+                return `
+                    <tr>
+                        <td class="rank-col">${song.rank}</td>
+                        <td>${song.title}</td>
+                        <td>${song.artist}</td>
+                        <td>${song.views}</td>
+                        <td class="${riskClass}">${song.risk}%</td>
+                        <td><span class="${riskClass}">${statusIcon} ${song.status}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function acceptDisclaimer() {
+            document.getElementById('disclaimerPopup').classList.add('hidden');
+            document.getElementById('mainContent').style.display = 'block';
+            localStorage.setItem('disclaimerAccepted', Date.now().toString());
+            
+            fetchData();
+        }
+
+        function rejectDisclaimer() {
+            alert('이 서비스를 이용하려면 약관에 동의해야 합니다.');
+        }
+
+        window.addEventListener('DOMContentLoaded', function() {
+            const accepted = localStorage.getItem('disclaimerAccepted');
+            if (accepted) {
+                const lastTime = parseInt(accepted);
+                const now = Date.now();
+                const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+                
+                if (now - lastTime < thirtyDaysMs) {
+                    acceptDisclaimer();
+                    return;
+                }
+            }
+
+            document.getElementById('disclaimerPopup').classList.remove('hidden');
+        });
+    </script>
+
+</body>
+</html>
