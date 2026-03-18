@@ -1,5 +1,5 @@
-// K-Music Monitor — Vercel Serverless API Proxy
-// YouTube API 키 서버 측 보관 (process.env.YOUTUBE_API_KEY)
+// K-Music Monitor ??Vercel Serverless API Proxy
+// YouTube API ???�버 �?보�? (process.env.YOUTUBE_API_KEY)
 
 const YT_BASE = 'https://www.googleapis.com/youtube/v3';
 
@@ -17,8 +17,8 @@ function parseVideos(items) {
             const isPrivate = t === 'private video' || t === 'deleted video';
             const isShorts  = t.includes('#shorts') || t.includes('shorts')
                            || t.includes('short');
-            // 세로영상(shorts)은 duration 없이 제목으로만 필터 — 추가로 외국어 제목 제외
-            const isForeign = /[\u0900-\u097F\u0600-\u06FF]/.test(item.snippet?.title || ''); // 힌디/아랍어
+            // ?�로?�상(shorts)?� duration ?�이 ?�목?�로�??�터 ??추�?�??�국???�목 ?�외
+            const isForeign = /[\u0900-\u097F\u0600-\u06FF]/.test(item.snippet?.title || ''); // ?�디/?�랍??
             return !isPrivate && !isShorts && !isForeign;
         })
         .map(item => {
@@ -36,13 +36,13 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     const KEY = process.env.YOUTUBE_API_KEY;
-    if (!KEY) return res.status(500).json({ error: 'API 키 미설정' });
+    if (!KEY) return res.status(500).json({ error: 'API ??미설?? });
 
     const { channel, uploadsPlaylist, playlist, thumb } = req.query;
 
     try {
 
-        // 0. ?thumb=VIDEO_ID → 썸네일 프록시 (CORS 우회)
+        // 0. ?thumb=VIDEO_ID ???�네???�록??(CORS ?�회)
         if (thumb) {
             const qualities = ['mqdefault', 'hqdefault', 'sddefault', 'default'];
             for (const q of qualities) {
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
             return res.status(200).send(empty);
         }
 
-        // 1. ?playlist=OLAK5... → 채널 ID 반환
+        // 1. ?playlist=OLAK5... ??채널 ID 반환
         if (playlist) {
             const r = await fetch(`${YT_BASE}/playlists?part=snippet&id=${playlist}&key=${KEY}`);
             const d = await r.json();
@@ -68,22 +68,22 @@ export default async function handler(req, res) {
             return res.status(200).json({ channelId });
         }
 
-        // 2. ?uploadsPlaylist=UU... → 최신 영상 반환
+        // 2. ?uploadsPlaylist=UU... ??최신 ?�상 반환
         if (uploadsPlaylist) {
             const maxR = parseInt(req.query.maxResults || '10');
             const r = await fetch(
                 `${YT_BASE}/playlistItems?part=snippet&playlistId=${uploadsPlaylist}&maxResults=${maxR}&key=${KEY}`
             );
             const d = await r.json();
-            console.log(`[uploadsPlaylist] ${uploadsPlaylist} → items:${d.items?.length ?? 0} error:${d.error?.message||'none'}`);
+            console.log(`[uploadsPlaylist] ${uploadsPlaylist} ??items:${d.items?.length ?? 0} error:${d.error?.message||'none'}`);
             const videos = parseVideos(d.items);
-            console.log(`[uploadsPlaylist] after filter: ${videos.length}개`);
+            console.log(`[uploadsPlaylist] after filter: ${videos.length}�?);
             return res.status(200).json({ videos });
         }
 
-        // 3. ?channel=handle → 채널 ID + 최신 영상 반환
+        // 3. ?channel=handle ??채널 ID + 최신 ?�상 반환
         if (channel) {
-            // @ 있으면 그대로, 없으면 붙여서 시도
+            // @ ?�으�?그�?�? ?�으�?붙여???�도
             const handle = channel.startsWith('@') ? channel : `@${channel}`;
             const cr = await fetch(`${YT_BASE}/channels?part=id&forHandle=${handle}&key=${KEY}`);
             const cd = await cr.json();
@@ -98,7 +98,7 @@ export default async function handler(req, res) {
             return res.status(200).json({ channelId, videos: parseVideos(pd.items) });
         }
 
-        // 4. 메인 차트 (파라미터 없음)
+        // 4. 메인 차트 (?�라미터 ?�음)
         const sr = await fetch(
             `${YT_BASE}/videos?part=snippet,statistics&chart=mostPopular&regionCode=KR&videoCategoryId=10&maxResults=50&key=${KEY}`
         );
@@ -122,7 +122,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ chart });
 
     } catch (err) {
-        console.error('[API] 오류:', err);
+        console.error('[API] ?�류:', err);
         return res.status(500).json({ error: err.message });
     }
 }
