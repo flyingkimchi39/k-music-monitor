@@ -38,9 +38,27 @@ export default async function handler(req, res) {
     const KEY = process.env.YOUTUBE_API_KEY;
     if (!KEY) return res.status(500).json({ error: 'API 키 미설정' });
 
-    const { channel, uploadsPlaylist, playlist } = req.query;
+    const { channel, uploadsPlaylist, playlist, thumb } = req.query;
 
     try {
+
+        // 0. ?thumb=VIDEO_ID → 썸네일 프록시 (CORS 우회)
+        if (thumb) {
+            const qualities = ['mqdefault', 'hqdefault', 'sddefault', 'default'];
+            for (const q of qualities) {
+                const imgRes = await fetch(`https://i.ytimg.com/vi/${thumb}/${q}.jpg`);
+                if (imgRes.ok) {
+                    res.setHeader('Content-Type', 'image/jpeg');
+                    res.setHeader('Cache-Control', 's-maxage=86400');
+                    res.setHeader('Access-Control-Allow-Origin', '*');
+                    const buf = await imgRes.arrayBuffer();
+                    return res.status(200).send(Buffer.from(buf));
+                }
+            }
+            const empty = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64');
+            res.setHeader('Content-Type','image/gif');
+            return res.status(200).send(empty);
+        }
 
         // 1. ?playlist=OLAK5... → 채널 ID 반환
         if (playlist) {
@@ -96,7 +114,7 @@ export default async function handler(req, res) {
                 rank, videoId: item.id,
                 title:     item.snippet?.title || '',
                 channel:   item.snippet?.channelTitle || '',
-                thumbnail: `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
+                thumbnail: `/api/youtube?thumb=${item.id}`,
                 views: v, likes: l, comments: c,
                 risk: calcRisk(v, l, c, rank),
             };
