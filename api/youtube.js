@@ -117,7 +117,7 @@ if (req.url?.includes('debug')) {
                 rank, videoId: item.id,
                 title:     item.snippet?.title || '',
                 channel:   item.snippet?.channelTitle || '',
-                thumbnail: `/api/youtube?thumb=${item.id}`,
+                thumbnail: `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
                 views: v, likes: l, comments: c,
                 risk: calcRisk(v, l, c, rank),
             };
