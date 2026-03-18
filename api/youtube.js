@@ -32,6 +32,9 @@ function parseVideos(items) {
 }
 
 export default async function handler(req, res) {
+if (req.url?.includes('debug')) {
+        return res.status(200).json({ url: req.url, query: req.query });
+    }
     setCORS(res);
     if (req.method === 'OPTIONS') return res.status(200).end();
 
