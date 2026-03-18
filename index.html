@@ -796,12 +796,10 @@ async function loadRecVideos() {
 
             if (!channelId) {
                 if (ch.playlistId) {
-                    // 앨범/플레이리스트 ID → 채널 ID 조회 (YONKO 등)
-                    const plRes = await fetch(
-                        `${BACKEND_URL}?playlist=${ch.playlistId}`
-                    );
+                    // 앨범/플레이리스트 ID → 채널 ID 조회
+                    const plRes = await fetch(`${BACKEND_URL}?playlist=${ch.playlistId}`);
                     const plData = await plRes.json();
-                    channelId = plData.items?.[0]?.snippet?.channelId || null;
+                    channelId = plData.channelId || null;  // 백엔드가 { channelId } 반환
                     console.log(`[REC] ${ch.name} playlist→channelId:`, channelId);
                 } else {
                     // @핸들 → 채널 ID 조회 (설레게, PLZY, KOCA TV)
@@ -820,7 +818,12 @@ async function loadRecVideos() {
             // ── Step 2: uploads playlist로 영상 가져오기 (1유닛) ─────────
             const videos = await fetchUploads(channelId, 10);
             if (videos.length) {
-                REC_VIDEOS[ch.handle] = videos;
+                // 백엔드 { videoId, title, thumbnail } → 클라이언트 { id, title, thumb }
+                REC_VIDEOS[ch.handle] = videos.map(v => ({
+                    id:    v.videoId,
+                    title: v.title,
+                    thumb: v.thumbnail,
+                }));
                 console.log(`[REC] ✅ ${ch.name}: ${videos.length}개 로드`);
             } else {
                 console.warn(`[REC] ⚠️ ${ch.name}: 영상 0개`);

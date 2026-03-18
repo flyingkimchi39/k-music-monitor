@@ -14,8 +14,12 @@ function parseVideos(items) {
     return (items || [])
         .filter(item => {
             const t = (item.snippet?.title || '').toLowerCase();
-            return t !== 'private video' && t !== 'deleted video'
-                && !t.includes('#shorts') && !t.includes('shorts');
+            const isPrivate = t === 'private video' || t === 'deleted video';
+            const isShorts  = t.includes('#shorts') || t.includes('shorts')
+                           || t.includes('short');
+            // 세로영상(shorts)은 duration 없이 제목으로만 필터 — 추가로 외국어 제목 제외
+            const isForeign = /[\u0900-\u097F\u0600-\u06FF]/.test(item.snippet?.title || ''); // 힌디/아랍어
+            return !isPrivate && !isShorts && !isForeign;
         })
         .map(item => ({
             videoId:   item.snippet.resourceId?.videoId || item.id,
@@ -53,12 +57,17 @@ export default async function handler(req, res) {
                 `${YT_BASE}/playlistItems?part=snippet&playlistId=${uploadsPlaylist}&maxResults=${maxR}&key=${KEY}`
             );
             const d = await r.json();
-            return res.status(200).json({ videos: parseVideos(d.items) });
+            console.log(`[uploadsPlaylist] ${uploadsPlaylist} → items:${d.items?.length ?? 0} error:${d.error?.message||'none'}`);
+            const videos = parseVideos(d.items);
+            console.log(`[uploadsPlaylist] after filter: ${videos.length}개`);
+            return res.status(200).json({ videos });
         }
 
         // 3. ?channel=handle → 채널 ID + 최신 영상 반환
         if (channel) {
-            const cr = await fetch(`${YT_BASE}/channels?part=id&forHandle=${channel}&key=${KEY}`);
+            // @ 있으면 그대로, 없으면 붙여서 시도
+            const handle = channel.startsWith('@') ? channel : `@${channel}`;
+            const cr = await fetch(`${YT_BASE}/channels?part=id&forHandle=${handle}&key=${KEY}`);
             const cd = await cr.json();
             const channelId = cd.items?.[0]?.id || null;
             if (!channelId) return res.status(200).json({ channelId: null, videos: [] });
