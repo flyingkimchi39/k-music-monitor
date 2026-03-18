@@ -3,851 +3,1801 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K-Music Monitor</title>
+    <title>K-Music Monitor v3</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --bg:      #07090f;
+            --bg2:     #0c1018;
+            --bg3:     #111620;
+            --bg4:     #161d2a;
+            --border:  rgba(88,120,255,0.1);
+            --borderH: rgba(88,120,255,0.35);
+            --acc:     #5878ff;
+            --acc2:    #a78bfa;
+            --danger:  #ff4560;
+            --warn:    #f59e0b;
+            --ok:      #34d399;
+            --text:    #dde3f0;
+            --muted:   #2d3748;
+            --muted2:  #64748b;
+            --mono:    'DM Mono', monospace;
+            --sans:    'DM Sans', sans-serif;
+        }
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        html, body { width:100%; min-height:100%; font-family:var(--sans); background:var(--bg); color:var(--text); overflow-x:hidden; }
+
+        /* ─── DISCLAIMER ─── */
+        #dlPopup { position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center; background:rgba(4,6,12,.97); backdrop-filter:blur(16px); }
+        #dlPopup.hidden { opacity:0; pointer-events:none; transition:opacity .3s; }
+        .dlg { background:var(--bg2); border:1px solid var(--borderH); border-radius:16px; padding:44px; max-width:440px; width:90%; box-shadow:0 32px 64px rgba(0,0,0,.6); animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both; }
+        @keyframes popIn { from{transform:scale(.9) translateY(20px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }
+        .dlg h2 { font-family:var(--sans); font-size:18px; font-weight:700; color:var(--text); margin-bottom:8px; letter-spacing:-.02em; }
+        .dlg p  { color:var(--muted2); font-size:13px; line-height:1.7; }
+        .dlg-hl { background:rgba(245,158,11,.05); border:1px solid rgba(245,158,11,.15); padding:14px 16px; margin:20px 0; border-radius:8px; color:#fbbf24; font-size:12px; line-height:1.8; font-family:var(--mono); }
+        .dlg-btns { display:flex; gap:10px; margin-top:28px; }
+        .btn-agree { flex:1; padding:12px; background:var(--acc); color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; font-family:var(--sans); transition:all .2s; }
+        .btn-agree:hover { background:#6d8bff; transform:translateY(-1px); box-shadow:0 6px 24px rgba(88,120,255,.4); }
+        .btn-deny  { flex:1; padding:12px; background:transparent; color:var(--muted2); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; font-family:var(--sans); transition:all .2s; }
+        .btn-deny:hover { border-color:var(--danger); color:var(--danger); }
+
+        /* ─── TOAST ─── */
+        #toast { position:fixed; bottom:28px; right:28px; z-index:99998; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:11px 18px; font-family:var(--mono); font-size:11px; color:var(--text); box-shadow:0 8px 32px rgba(0,0,0,.5); transform:translateY(60px); opacity:0; transition:all .3s cubic-bezier(.34,1.56,.64,1); max-width:300px; }
+        #toast.show { transform:translateY(0); opacity:1; }
+        #toast.err  { border-color:rgba(255,69,96,.4); color:var(--danger); }
+        #toast.ok   { border-color:rgba(52,211,153,.4); color:var(--ok); }
+
+        /* ─── RANK ALERT ─── */
+        #rankAlert { position:fixed; top:76px; right:24px; z-index:99997; background:var(--bg2); border:1px solid rgba(245,158,11,.2); border-radius:12px; padding:16px 18px; font-family:var(--mono); font-size:12px; box-shadow:0 8px 40px rgba(0,0,0,.5); transform:translateX(380px); opacity:0; transition:all .4s cubic-bezier(.34,1.56,.64,1); max-width:300px; min-width:250px; }
+        #rankAlert.show { transform:translateX(0); opacity:1; }
+        #rankAlert h4 { color:var(--warn); font-size:9px; letter-spacing:.14em; margin-bottom:12px; text-transform:uppercase; }
+
+        /* ─── 추천 채널 패널 (왼쪽 슬라이드인) ─── */
+        #recPanel {
+            position:fixed; top:0; left:0; bottom:0; z-index:99996;
+            width:440px;
+            background:var(--bg2); border-right:1px solid rgba(88,120,255,.18);
+            box-shadow:6px 0 40px rgba(0,0,0,.6);
+            display:flex; flex-direction:column;
+            transform:translateX(-460px); opacity:0;
+            transition:transform .45s cubic-bezier(.34,1.2,.64,1), opacity .3s ease;
+            overflow:hidden;
+        }
+        #recPanel.show { transform:translateX(0); opacity:1; }
+        /* 모바일: 패널 열리면 배경 딤 처리 */
+        #recDim { display:none; position:fixed; inset:0; z-index:99994; background:rgba(0,0,0,.55); backdrop-filter:blur(2px); }
+        #recDim.show { display:block; }
+        @media(max-width:600px) {
+            #recPanel { width:100vw; }
+        }
+        .rec-hdr { display:flex; align-items:center; justify-content:space-between; padding:18px 18px 14px; border-bottom:1px solid var(--border); flex-shrink:0; }
+        .rec-hdr-left { display:flex; flex-direction:column; }
+        .rec-hdr-row { display:flex; align-items:center; gap:8px; }
+        .rec-hdr-txt { font-family:var(--mono); font-size:11px; font-weight:600; color:var(--acc2); letter-spacing:.14em; text-transform:uppercase; }
+        .rec-shuffle-info { font-family:var(--mono); font-size:10px; color:var(--muted2); margin-top:4px; }
+        .rec-close { width:24px; height:24px; border:none; background:none; cursor:pointer; color:var(--muted2); font-size:14px; display:flex; align-items:center; justify-content:center; border-radius:5px; transition:all .15s; }
+        .rec-close:hover { background:rgba(255,255,255,.07); color:var(--text); }
+        .rec-body { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px; }
+        .rec-body::-webkit-scrollbar { width:3px; }
+        .rec-body::-webkit-scrollbar-thumb { background:var(--border); border-radius:99px; }
+        .rec-ch-card { background:var(--bg3); border:1px solid var(--border); border-radius:10px; overflow:visible; transition:border-color .15s; animation:recFadeIn .4s ease both; }
+        .rec-ch-card:hover { border-color:var(--borderH); }
+        @keyframes recFadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+        .rec-ch-hdr { display:flex; align-items:center; gap:9px; padding:10px 12px 8px; border-bottom:1px solid var(--border); text-decoration:none; color:inherit; transition:background .12s; }
+        .rec-ch-hdr:hover { background:rgba(88,120,255,.05); }
+        .rec-ch-ico { width:30px; height:30px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:10px; font-weight:700; }
+        .rec-ch-name { font-family:var(--sans); font-size:14px; font-weight:700; color:var(--text); }
+        .rec-ch-sub  { font-family:var(--mono); font-size:10px; color:var(--muted2); margin-top:2px; }
+        .rec-ch-arr  { margin-left:auto; font-size:10px; color:var(--muted2); flex-shrink:0; }
+        .rec-vids { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:10px 12px; }
+        .rec-vid { display:block; text-decoration:none; border-radius:8px; overflow:hidden; position:relative; aspect-ratio:16/9; background:var(--bg4); transition:transform .15s, box-shadow .15s; min-height:0; }
+        .rec-vid:hover { transform:scale(1.03); box-shadow:0 6px 22px rgba(0,0,0,.6); }
+        .rec-vid img { width:100%; height:100%; object-fit:cover; object-position:center top; display:block; position:absolute; inset:0; border-radius:8px; }
+        .rec-vid-overlay { position:absolute; inset:0; background:linear-gradient(0deg,rgba(0,0,0,.88) 0%,transparent 55%); opacity:0; transition:opacity .18s; display:flex; align-items:flex-end; padding:8px; }
+        .rec-vid:hover .rec-vid-overlay { opacity:1; }
+        .rec-vid-title { font-family:var(--sans); font-size:10px; font-weight:500; color:#fff; line-height:1.35; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; text-shadow:0 1px 3px rgba(0,0,0,.8); }
+        .rec-vid-ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:22px; }
+        .rec-skeleton { background:linear-gradient(90deg,var(--bg4) 25%,rgba(88,120,255,.07) 50%,var(--bg4) 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; border-radius:6px; aspect-ratio:16/9; }
+        @keyframes shimmer { to{background-position:-200% 0} }
+        .rec-shuffle-bar { height:2px; background:rgba(88,120,255,.08); flex-shrink:0; }
+        .rec-shuffle-fill { height:100%; background:var(--acc2); border-radius:1px; transition:width 1s linear; }
+        .rec-toggle { position:fixed; left:0; top:50%; z-index:99995; transform:translateY(-50%); background:var(--bg2); border:1px solid rgba(88,120,255,.25); border-left:none; border-radius:0 8px 8px 0; padding:14px 9px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:6px; transition:all .2s; box-shadow:4px 0 20px rgba(0,0,0,.4); }
+        .rec-toggle:hover { background:var(--bg3); border-color:var(--acc); }
+        .rec-toggle-txt { font-family:var(--mono); font-size:8px; color:var(--acc2); letter-spacing:.1em; writing-mode:vertical-rl; }
+        .rec-toggle-dot { width:6px; height:6px; background:var(--acc2); border-radius:50%; animation:blink 2s ease-in-out infinite; }
+
+        .rank-change-item { display:flex; align-items:center; gap:8px; margin-bottom:7px; font-size:11px; }
+        .rank-change-item:last-child { margin-bottom:0; }
+        .rc-thumb { width:26px; height:26px; border-radius:4px; object-fit:cover; background:var(--bg3); flex-shrink:0; }
+        .rc-title { color:var(--text); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .rc-up   { color:var(--ok);     font-weight:500; min-width:30px; text-align:right; }
+        .rc-down { color:var(--danger); font-weight:500; min-width:30px; text-align:right; }
+        .rc-new  { color:var(--acc2);   font-weight:500; min-width:30px; text-align:right; }
+
+        /* ─── LAYOUT ─── */
+        #app { display:none; position:relative; z-index:1; }
+        .wrap { max-width:1400px; margin:0 auto; padding:32px 28px; }
+
+        /* ─── HEADER ─── */
+        .hdr { display:flex; align-items:center; justify-content:space-between; padding-bottom:22px; margin-bottom:28px; border-bottom:1px solid var(--border); }
+        .hdr-logo { display:flex; align-items:center; gap:14px; }
+        .hdr-wordmark { font-family:var(--sans); font-size:15px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:var(--text); }
+        .hdr-wordmark em { color:var(--acc); font-style:normal; }
+        .hdr-divider { width:1px; height:12px; background:var(--border); }
+        .hdr-sub { font-family:var(--mono); font-size:12px; color:var(--muted2); letter-spacing:.04em; }
+        .hdr-right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+        /* pills */
+        .pill { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--border); border-radius:99px; padding:6px 14px; font-family:var(--mono); font-size:10px; color:var(--muted2); letter-spacing:.05em; white-space:nowrap; }
+        .pill-live { border-color:rgba(52,211,153,.18); color:var(--ok); }
+        .live-dot { width:5px; height:5px; background:var(--ok); border-radius:50%; animation:blink 2s ease-in-out infinite; flex-shrink:0; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
+
+        /* countdown */
+        .countdown-wrap { display:flex; align-items:center; gap:6px; }
+        .countdown-ring { position:relative; width:30px; height:30px; }
+        .countdown-ring svg { transform:rotate(-90deg); }
+        .countdown-ring circle { fill:none; stroke-width:2; }
+        .ring-bg   { stroke:rgba(88,120,255,.1); }
+        .ring-fill { stroke:var(--acc); stroke-linecap:round; transition:stroke-dashoffset 1s linear; }
+        .countdown-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:8px; font-weight:500; color:var(--acc); }
+        .countdown-lbl { font-family:var(--mono); font-size:9px; color:var(--muted2); }
+
+        /* ─── KPI STRIP ─── */
+        .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:28px; }
+        .stat { background:var(--bg2); padding:24px 28px; transition:background .15s; }
+        .stat:hover { background:var(--bg3); }
+        .stat-lbl { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--muted2); letter-spacing:.1em; text-transform:uppercase; margin-bottom:12px; }
+        .stat-val { font-family:var(--sans); font-size:34px; font-weight:700; color:var(--text); letter-spacing:-.04em; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .stat-sub { font-family:var(--mono); font-size:12px; color:var(--muted2); }
+
+        /* ─── CHARTS ─── */
+        .charts-row { display:grid; grid-template-columns:1fr 1fr 220px; gap:10px; margin-bottom:28px; align-items:start; }
+        .chart-box { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:20px; }
+        .chart-ttl { font-family:var(--mono); font-size:11px; font-weight:600; color:var(--muted2); letter-spacing:.12em; text-transform:uppercase; margin-bottom:18px; }
+
+        /* 가로형 바 차트 — 10개 항목 기준 높이 */
+        .chart-canvas-wrap          { position:relative; height:150px; }
+        .chart-canvas-wrap.bar-h    { height:320px; }   /* 가로 바: 항목당 ~32px */
+        .chart-canvas-wrap.scatter  { height:260px; }
+        .chart-canvas-wrap.donut-w  { height:240px; }
+
+        /* 도넛 center label */
+        .donut-center-wrap { position:relative; }
+        .donut-center-label {
+            position:absolute; inset:0;
+            display:flex; flex-direction:column;
+            align-items:center; justify-content:center;
+            pointer-events:none;
+            /* 레전드 공간 감안해서 위로 살짝 올림 */
+            padding-bottom:56px;
+        }
+        .dcl-num  { font-family:var(--sans); font-size:38px; font-weight:700; letter-spacing:-.04em; line-height:1; }
+        .dcl-sub  { font-family:var(--mono); font-size:11px; color:var(--muted2); letter-spacing:.08em; margin-top:5px; }
+
+        /* ─── TOOLBAR ─── */
+        .toolbar {
+            display: flex; flex-direction: column;
+            gap: 10px; margin-bottom: 20px;
+        }
+        .toolbar-row1 { display:flex; align-items:center; gap:10px; }
+        .search-wrap {
+            display:flex; align-items:center; gap:8px;
+            background:var(--bg2); border:1px solid var(--border);
+            border-radius:8px; padding:8px 14px;
+            flex:1; transition:border-color .2s;
+        }
+        .search-wrap:focus-within { border-color:var(--borderH); }
+        .search-wrap span { color:var(--muted2); font-size:11px; flex-shrink:0; }
+        .search-input { background:none; border:none; outline:none; color:var(--text); font-family:var(--mono); font-size:13px; width:100%; }
+        .search-input::placeholder { color:var(--muted2); }
+
+        /* 결과 수 표시 */
+        .search-count {
+            font-family:var(--mono); font-size:10px; color:var(--muted2);
+            white-space:nowrap; flex-shrink:0;
+            transition: color .2s;
+        }
+        .search-count.has-results { color:var(--acc); }
+
+        /* 필터 버튼 행 */
+        .filter-btns { display:flex; gap:5px; flex-wrap:wrap; align-items:center; }
+
+        .fbtn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 12px;
+            background: transparent; border: 1px solid var(--border);
+            border-radius: 6px; cursor: pointer;
+            font-family: var(--mono); font-size: 11px;
+            color: var(--muted2); letter-spacing: .05em;
+            transition: all .15s; white-space: nowrap;
+        }
+        .fbtn:hover { border-color: var(--borderH); color: var(--text); }
+        .fbtn:hover .fbtn-badge { background: rgba(88,120,255,.15); color: var(--text); }
+
+        /* active 상태 */
+        .fbtn.active { background: var(--acc); border-color: var(--acc); color: #fff; }
+        .fbtn.active .fbtn-badge {
+            background: rgba(255,255,255,.2);
+            color: #fff;
         }
 
-        html, body {
-            width: 100%;
-            height: 100%;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #0a0f1e 0%, #0f0f23 100%);
-            color: #e0e0e0;
-            overflow-x: hidden;
-        }
+        /* active 색상 — 필터별 */
+        .fbtn.active[data-filter="danger"] { background:var(--danger); border-color:var(--danger); }
+        .fbtn.active[data-filter="warn"]   { background:var(--warn);   border-color:var(--warn); color:#111; }
+        .fbtn.active[data-filter="warn"] .fbtn-badge { color:#111; }
+        .fbtn.active[data-filter="ok"]     { background:var(--ok);     border-color:var(--ok); color:#111; }
+        .fbtn.active[data-filter="ok"] .fbtn-badge { color:#111; }
+        .fbtn.active[data-filter="changed"]{ background:rgba(88,120,255,.85); border-color:var(--acc); }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 40px 24px;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        .header-title {
-            font-size: 32px;
-            font-weight: 900;
-            color: #667eea;
-            margin-bottom: 8px;
-            letter-spacing: -0.5px;
-        }
-
-        .header-icon {
-            font-size: 24px;
-            margin-right: 8px;
-        }
-
-        .header-subtitle {
-            color: #999;
-            font-size: 14px;
-            font-weight: 400;
-            letter-spacing: 0.02em;
-        }
-
-        .disclaimer-popup {
-            display: flex;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.95);
-            justify-content: center;
-            align-items: center;
-            z-index: 99999;
-            opacity: 1;
-            transition: opacity 0.3s ease;
-            backdrop-filter: blur(4px);
-        }
-
-        .disclaimer-popup.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .disclaimer-content {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border: 1px solid rgba(102, 126, 234, 0.3);
-            border-radius: 12px;
-            padding: 40px;
-            max-width: 500px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
-            text-align: center;
-            animation: slideIn 0.3s ease;
-            position: relative;
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateY(-50px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        .disclaimer-content h2 {
-            margin: 0 0 20px 0;
-            color: #667eea;
-            font-size: 24px;
-            font-weight: 900;
-        }
-
-        .disclaimer-content p {
-            color: #ccc;
-            line-height: 1.8;
-            margin: 15px 0;
-            font-size: 14px;
-        }
-
-        .disclaimer-highlight {
-            background: rgba(255, 193, 7, 0.1);
-            border-left: 4px solid #ffc107;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: left;
+        /* badge 숫자 칩 */
+        .fbtn-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 18px; height: 16px; padding: 0 5px;
+            background: rgba(88,120,255,.1);
             border-radius: 4px;
-            color: #ffc107;
-            font-size: 13px;
-            line-height: 1.6;
+            font-family: var(--mono); font-size: 9px; font-weight: 500;
+            color: var(--muted2);
+            transition: all .2s;
+            /* 숫자 바뀔 때 작은 펄스 */
+        }
+        .fbtn-badge.updated {
+            animation: badgePop .3s cubic-bezier(.34,1.56,.64,1);
+        }
+        @keyframes badgePop {
+            0%   { transform: scale(1); }
+            50%  { transform: scale(1.35); }
+            100% { transform: scale(1); }
         }
 
-        .disclaimer-buttons {
-            display: flex;
-            gap: 12px;
-            margin-top: 30px;
-            justify-content: center;
-        }
+        /* 위험 버튼 비활성 badge — 색상 힌트 */
+        .fbtn[data-filter="danger"] .fbtn-badge { background:rgba(255,69,96,.1);  color:var(--danger); }
+        .fbtn[data-filter="warn"]   .fbtn-badge { background:rgba(245,158,11,.1); color:var(--warn); }
+        .fbtn[data-filter="ok"]     .fbtn-badge { background:rgba(52,211,153,.1); color:var(--ok); }
+        .fbtn[data-filter="changed"].fbtn-badge { background:rgba(88,120,255,.1); color:var(--acc); }
 
-        .btn-agree {
-            flex: 1;
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 700;
-            transition: all 0.2s ease;
-            letter-spacing: 0.05em;
-        }
+        /* ─── SEC HDR ─── */
+        .sec-hdr { display:flex; align-items:center; gap:12px; margin-bottom:16px; font-family:var(--mono); font-size:11px; font-weight:600; color:var(--muted2); letter-spacing:.15em; text-transform:uppercase; }
+        .sec-hdr::after { content:''; flex:1; height:1px; background:var(--border); }
 
-        .btn-agree:hover {
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
-            transform: translateY(-2px);
-        }
+        /* ─── BILLBOARD CARDS ─── */
+        .cards-section { margin-bottom:28px; }
+        .cards-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
 
-        .btn-disagree {
-            flex: 1;
-            padding: 12px 24px;
-            background: rgba(220, 53, 69, 0.2);
-            color: #ff6b6b;
-            border: 1px solid #ff6b6b;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 700;
-            transition: all 0.2s ease;
-            letter-spacing: 0.05em;
-        }
+        .song-card { background:var(--bg2); display:flex; align-items:stretch; text-decoration:none; color:inherit; transition:background .12s; position:relative; min-height:72px; overflow:hidden; }
+        .song-card:hover { background:var(--bg3); }
+        .song-card.rank-changed { animation:flashRow .8s ease; }
+        @keyframes flashRow { 0%,100%{background:var(--bg2)} 40%{background:rgba(245,158,11,.07)} }
 
-        .btn-disagree:hover {
-            background: rgba(220, 53, 69, 0.3);
-            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
-        }
-
-        .btn-close-popup {
-            position: absolute;
-            top: 16px;
-            right: 16px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(102, 126, 234, 0.2);
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            cursor: pointer;
-            font-size: 18px;
-            font-weight: bold;
-            color: #667eea;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .btn-close-popup:hover {
-            background: rgba(102, 126, 234, 0.2);
-            border-color: #667eea;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 16px;
-            margin-bottom: 40px;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.04));
-            border: 1px solid rgba(102, 126, 234, 0.2);
-            border-radius: 8px;
-            padding: 20px;
-            text-align: left;
-            transition: all 0.2s ease;
-            cursor: pointer;
-        }
-
-        .stat-card:hover {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.12), rgba(118, 75, 162, 0.08));
-            border-color: rgba(102, 126, 234, 0.4);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
-            transform: translateY(-2px);
-        }
-
-        .stat-label {
-            color: #999;
-            font-size: 12px;
-            font-weight: 500;
-            margin-bottom: 8px;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-        }
-
-        .stat-value {
-            color: #667eea;
-            font-size: 24px;
-            font-weight: 900;
-            margin-bottom: 6px;
-            letter-spacing: -0.5px;
-        }
-
-        .stat-desc {
-            color: #666;
-            font-size: 12px;
-            font-weight: 400;
-            line-height: 1.4;
-        }
-
-        .section-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 16px;
-            font-size: 14px;
-            font-weight: 700;
-            color: #667eea;
-            letter-spacing: 0.05em;
-        }
-
-        .section-icon {
-            font-size: 18px;
-        }
-
-        .top-10-container {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.04));
-            border: 1px solid rgba(102, 126, 234, 0.2);
-            border-radius: 8px;
-            padding: 24px;
-            margin-bottom: 40px;
-        }
-
-        .top-10-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-            margin-top: 16px;
-        }
-
-        .top-10-item {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.12), rgba(118, 75, 162, 0.08));
-            border: 1px solid rgba(102, 126, 234, 0.25);
-            border-radius: 8px;
-            padding: 20px;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .top-10-item::before {
+        /* ── border-left accent bar ── */
+        /* ::before 가상 요소로 구현 — 애니메이션 포함 */
+        .song-card::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, #667eea, transparent);
-            opacity: 0;
-            transition: opacity 0.2s ease;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
+            border-radius: 0;
+            transform: scaleY(0);
+            transform-origin: top center;
+            transition: transform .35s cubic-bezier(.34,1.56,.64,1);
+        }
+        .song-card.accent-up::before {
+            background: var(--ok);            /* 상승 → 초록 */
+            transform: scaleY(1);
+        }
+        .song-card.accent-down::before {
+            background: var(--danger);        /* 하락 → 빨강 */
+            transform: scaleY(1);
+        }
+        .song-card.accent-new::before {
+            background: var(--acc2);          /* 신규 진입 → 보라 */
+            transform: scaleY(1);
+        }
+        .song-card.accent-hot::before {
+            /* 급상승 (5위↑) — 그라디언트로 강조 */
+            background: linear-gradient(180deg, #34d399, #5878ff);
+            transform: scaleY(1);
+            width: 3px;
         }
 
-        .top-10-item:hover {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.18), rgba(118, 75, 162, 0.12));
-            border-color: rgba(102, 126, 234, 0.4);
-            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
-            transform: translateY(-4px);
+        /* 배경 tint — 급변동 곡만 */
+        .song-card.accent-hot  { background: rgba(52,211,153,.03); }
+        .song-card.accent-drop { background: rgba(255,69,96,.03); }
+        .song-card.accent-new  { background: rgba(167,139,250,.03); }
+
+        /* accent-drop 도 before 필요 */
+        .song-card.accent-drop::before {
+            background: linear-gradient(180deg, #ff4560, #f59e0b);
+            transform: scaleY(1);
+            width: 3px;
         }
 
-        .top-10-item:hover::before {
-            opacity: 1;
-        }
+        /* 호버시 accent 더 밝게 */
+        .song-card.accent-up:hover   { background: rgba(52,211,153,.05); }
+        .song-card.accent-down:hover { background: rgba(255,69,96,.05); }
+        .song-card.accent-hot:hover  { background: rgba(52,211,153,.07); }
+        .song-card.accent-drop:hover { background: rgba(255,69,96,.06); }
+        .song-card.accent-new:hover  { background: rgba(167,139,250,.05); }
 
-        .top-10-rank {
-            color: #764ba2;
-            font-size: 13px;
-            font-weight: 900;
-            margin-bottom: 8px;
-            letter-spacing: 0.05em;
-            font-family: 'Courier New', monospace;
-        }
+        /* rank col */
+        .card-rank-col { width:52px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 0; border-right:1px solid var(--border); }
+        .card-rank-num { font-family:var(--sans); font-size:22px; font-weight:700; color:var(--muted2); letter-spacing:-.04em; line-height:1; transition:color .15s; }
+        .card-rank-num.top3 { color:var(--acc); }
+        .song-card:hover .card-rank-num { color:var(--text); }
+        .card-rank-arrow { font-family:var(--mono); font-size:8px; margin-top:3px; }
+        .card-rank-arrow.up   { color:var(--ok); }
+        .card-rank-arrow.down { color:var(--danger); }
+        .card-rank-arrow.new  { color:var(--acc2); font-size:7px; letter-spacing:.04em; }
+        .card-rank-arrow.same { color:var(--muted); }
 
-        .top-10-title {
-            color: #667eea;
-            font-size: 16px;
-            font-weight: 700;
-            margin-bottom: 6px;
-            letter-spacing: -0.3px;
-            line-height: 1.4;
-        }
+        /* thumb */
+        .card-thumb-col { width:52px; height:52px; flex-shrink:0; margin:10px 8px; border-radius:5px; overflow:hidden; background:var(--bg3); }
+        .card-thumb { width:100%; height:100%; object-fit:cover; display:block; }
+        .card-thumb-ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:16px; }
 
-        .top-10-desc {
-            color: #888;
-            font-size: 12px;
-            font-weight: 400;
-            line-height: 1.4;
-        }
+        /* info */
+        .card-info { flex:1; padding:14px 10px; min-width:0; }
+        .card-title { font-size:14px; font-weight:700; color:var(--text); letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:3px; }
+        .card-artist { font-size:12px; color:var(--muted2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:7px; }
+        .card-meta { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+        .card-views { font-family:var(--mono); font-size:11px; color:var(--muted2); }
+        .card-risk-pill { font-family:var(--mono); font-size:10px; font-weight:600; padding:3px 8px; border-radius:4px; }
+        .risk-d { background:rgba(255,69,96,.12);  color:var(--danger); }
+        .risk-w { background:rgba(245,158,11,.1);  color:var(--warn); }
+        .risk-k { background:rgba(52,211,153,.08); color:var(--ok); }
 
-        .rest-container {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.04));
-            border: 1px solid rgba(102, 126, 234, 0.2);
-            border-radius: 8px;
-            padding: 24px;
-            margin-bottom: 40px;
-        }
+        /* risk bar right col — 4px로 두껍게 */
+        .card-risk-col { width:40px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:14px 8px; border-left:1px solid var(--border); }
+        .card-risk-pct { font-family:var(--mono); font-size:13px; font-weight:700; }
+        .card-risk-bar-v { width:4px; flex:1; max-height:28px; background:rgba(88,120,255,.08); border-radius:99px; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; }
+        .card-risk-fill-v { width:100%; border-radius:99px; transition:height .7s cubic-bezier(.34,1.2,.64,1); }
+        .crf-d { background:var(--danger); box-shadow:0 0 6px rgba(255,69,96,.4); }
+        .crf-w { background:var(--warn);   box-shadow:0 0 6px rgba(245,158,11,.3); }
+        .crf-k { background:var(--ok);     box-shadow:0 0 6px rgba(52,211,153,.2); }
 
-        .rest-label {
-            color: #666;
-            font-size: 12px;
-            font-weight: 400;
-            margin-bottom: 12px;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+        /* ─── SPARKLINE ─── */
+        .spark-wrap {
+            padding: 8px 10px 8px 0;
+            display: flex; flex-direction: column;
+            gap: 2px; justify-content: flex-end;
+            border-top: 1px solid var(--border);
+            margin-top: 6px;
         }
-
-        .rest-items {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 12px;
-            margin-top: 12px;
+        .spark-svg { display:block; overflow:visible; }
+        .spark-line { fill:none; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+        .spark-dot  { }   /* 최신 포인트 강조 */
+        .spark-lbl  {
+            font-family:var(--mono); font-size:8px; color:var(--muted2);
+            letter-spacing:.04em; display:flex; justify-content:space-between;
         }
+        .spark-lbl-trend { font-weight:500; }
 
-        .rest-item {
-            background: rgba(102, 126, 234, 0.05);
-            border: 1px solid rgba(102, 126, 234, 0.15);
-            border-radius: 6px;
-            padding: 12px;
-            font-size: 11px;
-            color: #aaa;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+        /* ─── TABLE ─── */
+        .tbl-wrap { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:24px; }
+        .tbl-inner { overflow-x:auto; max-height:500px; overflow-y:auto; }
+        .tbl-inner::-webkit-scrollbar { width:3px; height:3px; }
+        .tbl-inner::-webkit-scrollbar-thumb { background:var(--border); border-radius:99px; }
+        table { width:100%; border-collapse:collapse; }
 
-        .rest-item:hover {
-            background: rgba(102, 126, 234, 0.1);
-            border-color: rgba(102, 126, 234, 0.3);
-            color: #ccc;
-        }
-
-        .rest-item-rank {
-            color: #764ba2;
-            font-weight: 700;
-            margin-right: 4px;
-            font-family: 'Courier New', monospace;
-        }
-
-        .charts-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 16px;
-            margin-bottom: 40px;
-        }
-
-        .chart-container {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.04));
-            border: 1px solid rgba(102, 126, 234, 0.2);
-            border-radius: 8px;
-            padding: 24px;
-            min-height: 320px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            transition: all 0.2s ease;
-        }
-
-        .chart-container:hover {
-            border-color: rgba(102, 126, 234, 0.4);
-            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.1);
-        }
-
-        .chart-title {
-            color: #667eea;
-            font-weight: 700;
-            font-size: 13px;
-            margin-bottom: 20px;
-            letter-spacing: 0.05em;
-        }
-
-        .chart-placeholder {
-            width: 100%;
-            height: 240px;
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.03));
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #666;
-            font-size: 12px;
-        }
-
-        .table-container {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.04));
-            border: 1px solid rgba(102, 126, 234, 0.2);
-            border-radius: 8px;
-            padding: 24px;
-            overflow-x: auto;
-            margin-bottom: 40px;
-            max-height: 800px;
-            overflow-y: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
+        /* 헤더 — 정렬 가능한 것 강조 */
         th {
-            background: rgba(102, 126, 234, 0.1);
-            padding: 14px 16px;
-            text-align: left;
-            color: #667eea;
-            font-weight: 700;
-            font-size: 12px;
-            letter-spacing: 0.05em;
-            border-bottom: 2px solid rgba(102, 126, 234, 0.2);
-            text-transform: uppercase;
+            background:var(--bg2); padding:12px 16px;
+            text-align:left; font-family:var(--mono); font-size:11px;
+            color:var(--muted2); font-weight:500; letter-spacing:.12em; text-transform:uppercase;
+            border-bottom:1px solid var(--border); position:sticky; top:0; z-index:5;
+            white-space:nowrap;
         }
-
-        td {
-            padding: 14px 16px;
-            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
-            color: #e0e0e0;
-            font-size: 13px;
+        .th-sort {
+            cursor: pointer;
+            user-select: none;
+            transition: color .15s;
         }
+        .th-sort:hover { color: var(--text); }
+        .th-sort.asc  { color: var(--acc); }
+        .th-sort.desc { color: var(--acc); }
+        .th-sort.asc  .sort-ico::after { content: ' ↑'; }
+        .th-sort.desc .sort-ico::after { content: ' ↓'; }
+        .sort-ico { color: var(--muted); font-size: 9px; }
+        .th-sort.asc  .sort-ico,
+        .th-sort.desc .sort-ico { color: var(--acc); }
 
-        tr:hover {
-            background: rgba(102, 126, 234, 0.08);
+        td { padding:12px 16px; font-size:14px; border-bottom:1px solid rgba(88,120,255,.04); vertical-align:middle; }
+        tr:last-child td { border-bottom:none; }
+        tr:hover td { background:rgba(88,120,255,.03); }
+
+        .trc { font-family:var(--mono); font-weight:600; color:var(--muted2); width:36px; font-size:12px; }
+        .song-cell { display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit; }
+        .s-thumb { width:34px; height:34px; border-radius:5px; object-fit:cover; flex-shrink:0; background:var(--bg3); }
+        .s-thumb-ph { width:34px; height:34px; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; background:var(--bg3); }
+        .s-ttl { font-weight:700; font-size:14px; letter-spacing:-.01em; }
+        .s-art { font-size:12px; color:var(--muted2); margin-top:2px; }
+        .sd { color:var(--danger); font-family:var(--mono); font-size:10px; }
+        .sw { color:var(--warn);   font-family:var(--mono); font-size:10px; }
+        .sk { color:var(--ok);     font-family:var(--mono); font-size:10px; }
+        .td-rank-chg { font-family:var(--mono); font-size:10px; }
+
+        /* 수치 셀 */
+        .td-num { font-family:var(--mono); font-size:13px; color:var(--text); white-space:nowrap; }
+        .td-num-sub { font-family:var(--mono); font-size:11px; color:var(--muted2); margin-top:2px; }
+
+        /* 좋아요율 / 댓글율 — 색상 등급 */
+        .rate-hi  { color: var(--ok);     }
+        .rate-mid { color: var(--warn);   }
+        .rate-lo  { color: var(--danger); }
+
+        /* 참여도 바 */
+        .eng-wrap { display:flex; flex-direction:column; gap:4px; }
+        .eng-bars { display:flex; gap:3px; align-items:flex-end; height:18px; }
+        .eng-bar {
+            flex:1; border-radius:2px 2px 0 0;
+            transition: height .5s ease;
+            min-height: 2px;
         }
+        .eng-bar-like    { background: var(--ok);     opacity:.7; }
+        .eng-bar-comment { background: var(--acc2);   opacity:.7; }
+        .eng-lbl { font-family:var(--mono); font-size:10px; color:var(--muted2); white-space:nowrap; }
 
-        tr:last-child td {
-            border-bottom: none;
-        }
+        .no-results { text-align:center; color:var(--muted2); font-family:var(--mono); font-size:11px; padding:40px; letter-spacing:.06em; }
+        .spinner-wrap { display:flex; align-items:center; justify-content:center; padding:56px; }
+        .spinner { width:22px; height:22px; border:1.5px solid rgba(88,120,255,.12); border-top-color:var(--acc); border-radius:50%; animation:spin .7s linear infinite; }
+        @keyframes spin { to{transform:rotate(360deg)} }
 
-        .rank-col {
-            color: #764ba2;
-            font-weight: 900;
-            font-family: 'Courier New', monospace;
-            width: 40px;
-        }
+        .tracking-badge { display:inline-flex; align-items:center; gap:4px; background:rgba(52,211,153,.05); border:1px solid rgba(52,211,153,.12); border-radius:4px; padding:2px 7px; font-family:var(--mono); font-size:9px; color:var(--ok); letter-spacing:.08em; }
+        .tracking-dot { width:4px; height:4px; background:var(--ok); border-radius:50%; animation:blink 1.4s ease-in-out infinite; }
 
-        .status-normal {
-            color: #51cf66;
-            font-weight: 600;
-        }
-
-        .status-warning {
-            color: #ffc107;
-            font-weight: 600;
-        }
-
-        .status-danger {
-            color: #ff6b6b;
-            font-weight: 600;
-        }
-
-        .table-container::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .table-container::-webkit-scrollbar-track {
-            background: rgba(102, 126, 234, 0.05);
-        }
-
-        .table-container::-webkit-scrollbar-thumb {
-            background: rgba(102, 126, 234, 0.3);
-            border-radius: 4px;
-        }
-
-        .table-container::-webkit-scrollbar-thumb:hover {
-            background: rgba(102, 126, 234, 0.5);
-        }
-
-        .loading {
-            text-align: center;
-            color: #667eea;
-            font-weight: 600;
-            padding: 20px;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 24px 16px;
-            }
-
-            .header-title {
-                font-size: 24px;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-                gap: 12px;
-            }
-
-            .top-10-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .disclaimer-content {
-                padding: 32px 24px;
-                max-width: 90vw;
-            }
-        }
+        @media(max-width:1100px) { .charts-row { grid-template-columns:1fr 1fr; } .charts-row .chart-box:last-child { grid-column:1/-1; } }
+        @media(max-width:860px)  { .stats { grid-template-columns:repeat(2,1fr); } .charts-row { grid-template-columns:1fr; } }
+        @media(max-width:560px)  { .stats { grid-template-columns:1fr; } .hdr { flex-direction:column; align-items:flex-start; gap:12px; } .cards-grid { grid-template-columns:1fr; } }
     </style>
 </head>
 <body>
 
-    <div class="disclaimer-popup" id="disclaimerPopup">
-        <div class="disclaimer-content">
-            <button class="btn-close-popup" onclick="acceptDisclaimer()">✕</button>
-            
-            <h2>⚖️ 법적 고지사항</h2>
-            <p>K-Music Monitor 서비스 이용 약관</p>
-            
-            <div class="disclaimer-highlight">
-                <strong>📌 중요 사항:</strong><br>
-                ✓ YouTube 공식 API 기반 분석<br>
-                ✓ 교육 및 통계 목적만 제공<br>
-                ✓ 개인 학습용도 허용<br>
-                ✗ 상업적 무단 사용 금지
-            </div>
+<!-- DISCLAIMER -->
+<div id="dlPopup">
+    <div class="dlg">
+        <h2>⚖️ 법적 고지사항</h2>
+        <p>K-Music Monitor 서비스 이용 약관</p>
+        <div class="dlg-hl">
+            📌 중요 사항:<br>
+            ✓ YouTube 공식 API 기반 분석<br>
+            ✓ 교육 및 통계 목적만 제공<br>
+            ✓ 개인 학습용도 허용<br>
+            ✗ 상업적 무단 사용 금지
+        </div>
+        <p>본 서비스를 이용함으로써 위 사항에 동의하는 것으로 간주됩니다.</p>
+        <div class="dlg-btns">
+            <button class="btn-agree" onclick="acceptDl()">동의</button>
+            <button class="btn-deny"  onclick="denyDl()">거절</button>
+        </div>
+    </div>
+</div>
 
-            <p>본 서비스를 이용함으로써 위 사항에 동의하는 것으로 간주됩니다.</p>
+<!-- RANK ALERT PANEL -->
+<div id="rankAlert">
+    <h4>📊 LIVE · 순위 변동 감지</h4>
+    <div id="rankAlertBody"></div>
+</div>
 
-            <div class="disclaimer-buttons">
-                <button class="btn-agree" onclick="acceptDisclaimer()">동의</button>
-                <button class="btn-disagree" onclick="rejectDisclaimer()">거절</button>
+<!-- 추천 채널 토글 버튼 (왼쪽 중앙) -->
+<button class="rec-toggle" id="recToggle" onclick="toggleRec()">
+    <span class="rec-toggle-dot"></span>
+    <span class="rec-toggle-txt">추천채널</span>
+</button>
+
+<!-- 딤 오버레이 (모바일용) -->
+<div id="recDim" onclick="toggleRec()"></div>
+
+<!-- 추천 채널 패널 (왼쪽 전체 슬라이드인) -->
+<div id="recPanel">
+    <div class="rec-hdr">
+        <div class="rec-hdr-left">
+            <div class="rec-hdr-row">
+                <span style="font-size:13px">🎵</span>
+                <span class="rec-hdr-txt">추천 채널</span>
             </div>
+            <div class="rec-shuffle-info" id="recShuffleInfo">최신 영상 로딩 중...</div>
+        </div>
+        <button class="rec-close" onclick="toggleRec()">✕</button>
+    </div>
+    <div class="rec-shuffle-bar"><div class="rec-shuffle-fill" id="recShuffleFill" style="width:100%"></div></div>
+    <div class="rec-body" id="recBody">
+        <!-- JS로 렌더링 -->
+    </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- APP -->
+<div id="app">
+<div class="wrap">
+
+    <!-- Header -->
+    <div class="hdr">
+        <div class="hdr-logo">
+            <div class="hdr-wordmark">K-MUSIC <em>MONITOR</em></div>
+            <div class="hdr-divider"></div>
+            <div class="hdr-sub">음원 사재기 검열 시스템 · <span class="tracking-badge"><span class="tracking-dot"></span>LIVE</span></div>
+        </div>
+        <div class="hdr-right">
+            <div class="countdown-wrap">
+                <div class="countdown-ring">
+                    <svg width="30" height="30" viewBox="0 0 36 36">
+                        <circle class="ring-bg"   cx="18" cy="18" r="15" stroke-dasharray="94.2 94.2"/>
+                        <circle class="ring-fill" cx="18" cy="18" r="15" id="ringFill" stroke-dasharray="94.2 94.2" stroke-dashoffset="0"/>
+                    </svg>
+                    <div class="countdown-num" id="countNum">12s</div>
+                </div>
+                <div class="countdown-lbl">갱신</div>
+            </div>
+            <div class="pill" id="searchCountBadge">🔍 48s</div>
+            <div class="pill pill-live"><span class="live-dot"></span>LIVE · KST</div>
+            <div class="pill" id="modeBadge">YouTube API</div>
         </div>
     </div>
 
-    <div id="mainContent" style="display: none;">
-        <div class="container">
-            <div class="header">
-                <h1 class="header-title"><span class="header-icon">🎵</span>K-Music Monitor</h1>
-                <p class="header-subtitle">YouTube 및 Melon 음악 데이터 실시간 분석 대시보드</p>
-            </div>
+    <!-- Stats -->
+    <div class="stats">
+        <div class="stat"><div class="stat-lbl">현재 1위</div><div class="stat-val" id="s1">—</div><div class="stat-sub" id="s1d">—</div></div>
+        <div class="stat"><div class="stat-lbl">1위 조회수</div><div class="stat-val" id="s2">—</div><div class="stat-sub">유튜브 누적</div></div>
+        <div class="stat"><div class="stat-lbl">위험 의심</div><div class="stat-val" id="s3">0</div><div class="stat-sub">의심지수 50% 초과</div></div>
+        <div class="stat"><div class="stat-lbl">마지막 갱신</div><div class="stat-val" id="s4">—</div><div class="stat-sub" id="s4d">순위 변동 <span id="s4changes" style="color:var(--warn)">0</span>건</div></div>
+    </div>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-label">YouTube 1위</div>
-                    <div class="stat-value" id="stat1">로딩중...</div>
-                    <div class="stat-desc" id="stat1-desc">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">🎵 음악 1위</div>
-                    <div class="stat-value" id="stat2">로딩중...</div>
-                    <div class="stat-desc" id="stat2-desc">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">⌚ 위험 곡</div>
-                    <div class="stat-value" id="stat3">0</div>
-                    <div class="stat-desc" id="stat3-desc">의심 영역</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">⏱️ 업데이트</div>
-                    <div class="stat-value" id="stat4">---</div>
-                    <div class="stat-desc" id="stat4-desc">실시간 종계</div>
-                </div>
-            </div>
-
-            <div class="top-10-container">
-                <div class="section-header">
-                    <span class="section-icon">🔥</span>
-                    Top 10 위험곡 (사제기 의심)
-                </div>
-                <div class="top-10-grid" id="top10Grid">
-                    <div class="loading">로딩중...</div>
-                </div>
-            </div>
-
-            <div class="charts-grid">
-                <div class="chart-container">
-                    <div class="chart-title">📊 YouTube Top 10 조회수</div>
-                    <div class="chart-placeholder">
-                        <svg width="240" height="200" viewBox="0 0 240 200">
-                            <rect x="20" y="40" width="20" height="120" fill="#667eea" rx="3"/>
-                            <rect x="50" y="80" width="20" height="80" fill="#667eea" rx="3"/>
-                            <rect x="80" y="110" width="20" height="50" fill="#667eea" rx="3"/>
-                            <rect x="110" y="130" width="20" height="30" fill="#667eea" rx="3"/>
-                            <rect x="140" y="150" width="20" height="10" fill="#667eea" rx="3"/>
-                            <line x1="10" y1="160" x2="170" y2="160" stroke="#666" stroke-width="1"/>
-                        </svg>
-                    </div>
-                </div>
-
-                <div class="chart-container">
-                    <div class="chart-title">📈 댓글/좋아요 비율</div>
-                    <div class="chart-placeholder">
-                        <svg width="240" height="200" viewBox="0 0 240 200">
-                            <path d="M 20 150 Q 60 100, 100 80 T 180 110" stroke="#667eea" stroke-width="2" fill="none"/>
-                            <path d="M 20 160 Q 60 140, 100 130 T 180 140" stroke="#764ba2" stroke-width="2" fill="none"/>
-                            <circle cx="20" cy="150" r="3" fill="#667eea"/>
-                            <circle cx="100" cy="80" r="3" fill="#667eea"/>
-                            <circle cx="180" cy="110" r="3" fill="#667eea"/>
-                        </svg>
-                    </div>
-                </div>
-
-                <div class="chart-container">
-                    <div class="chart-title">🥧 위험도 분포</div>
-                    <div class="chart-placeholder">
-                        <svg width="200" height="200" viewBox="0 0 200 200">
-                            <circle cx="100" cy="100" r="70" fill="none" stroke="#667eea" stroke-width="15" stroke-dasharray="110 440" transform="rotate(-90 100 100)"/>
-                            <circle cx="100" cy="100" r="70" fill="none" stroke="#764ba2" stroke-width="15" stroke-dasharray="165 440" stroke-dashoffset="-110" transform="rotate(-90 100 100)"/>
-                            <circle cx="100" cy="100" r="70" fill="none" stroke="#51cf66" stroke-width="15" stroke-dasharray="165 440" stroke-dashoffset="-275" transform="rotate(-90 100 100)"/>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-
-            <div class="rest-container">
-                <div class="section-header">
-                    <span class="section-icon">📋</span>
-                    Rest of 90 Songs
-                </div>
-                <div class="rest-label">위험도 낮은 곡들 (11-100위)</div>
-                <div class="rest-items" id="restItems">
-                    <div class="loading">로딩중...</div>
-                </div>
-            </div>
-
-            <div>
-                <div class="section-header">
-                    <span class="section-icon">🎼</span>
-                    Top 100 곡 현황
-                </div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>순위</th>
-                                <th>곡명</th>
-                                <th>아티스트</th>
-                                <th>조회수</th>
-                                <th>위험도</th>
-                                <th>상태</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody">
-                            <tr><td colspan="6" class="loading">데이터 로딩중...</td></tr>
-                        </tbody>
-                    </table>
+    <!-- Charts -->
+    <div class="charts-row">
+        <div class="chart-box">
+            <div class="chart-ttl">TOP 10 위험도</div>
+            <div class="chart-canvas-wrap bar-h"><canvas id="chartRisk"></canvas></div>
+        </div>
+        <div class="chart-box">
+            <div class="chart-ttl">조회수 vs 위험도</div>
+            <div class="chart-canvas-wrap scatter"><canvas id="chartScatter"></canvas></div>
+        </div>
+        <div class="chart-box">
+            <div class="chart-ttl">위험도 분포</div>
+            <div class="chart-canvas-wrap donut-w donut-center-wrap">
+                <canvas id="chartDonut"></canvas>
+                <div class="donut-center-label" id="donutCenter">
+                    <div class="dcl-num" id="dcl-num" style="color:var(--danger)">—</div>
+                    <div class="dcl-sub">의심 곡</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
-        let TOP_100 = [];
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <div class="toolbar-row1">
+            <div class="search-wrap">
+                <span>⌕</span>
+                <input class="search-input" type="text" id="searchInput" placeholder="곡명 또는 아티스트 검색..." oninput="applyFilter()">
+                <span class="search-count" id="searchCount">50곡</span>
+            </div>
+        </div>
+        <div class="filter-btns">
+            <button class="fbtn active" data-filter="all"     onclick="setFilter(this,'all')">전체 <span class="fbtn-badge" id="fbadge-all">50</span></button>
+            <button class="fbtn"        data-filter="danger"  onclick="setFilter(this,'danger')">위험 <span class="fbtn-badge" id="fbadge-danger">—</span></button>
+            <button class="fbtn"        data-filter="warn"    onclick="setFilter(this,'warn')">주의 <span class="fbtn-badge" id="fbadge-warn">—</span></button>
+            <button class="fbtn"        data-filter="ok"      onclick="setFilter(this,'ok')">정상 <span class="fbtn-badge" id="fbadge-ok">—</span></button>
+            <button class="fbtn"        data-filter="changed" onclick="setFilter(this,'changed')">변동 <span class="fbtn-badge" id="fbadge-changed">—</span></button>
+        </div>
+    </div>
 
-        async function fetchData() {
-            try {
-                const youtubeRes = await fetch('/api/youtube');
-                const youtubeData = youtubeRes.ok ? await youtubeRes.json() : { chart: [] };
-                
-                const melonRes = await fetch('/api/melon');
-                const melonData = melonRes.ok ? await melonRes.json() : { chart: [] };
+    <!-- Cards Grid -->
+    <div class="cards-section">
+        <div class="sec-hdr">전체 차트</div>
+        <div class="cards-grid" id="cardsGrid">
+            <div style="grid-column:1/-1"><div class="spinner-wrap"><div class="spinner"></div></div></div>
+        </div>
+    </div>
 
-                let youtubeChart = youtubeData.chart || [];
-                let melonChart = melonData.chart || [];
-
-                if (youtubeChart.length === 0 || melonChart.length === 0) {
-                    generateDummyData();
-                } else {
-                    TOP_100 = [
-                        ...youtubeChart.slice(0, 50).map((item, i) => ({
-                            rank: i + 1,
-                            title: item.title || '제목 없음',
-                            artist: item.artist || item.channel || '-',
-                            views: Math.floor(item.views / 1000) + 'K',
-                            risk: Math.min(100, item.suspicionScore || 0),
-                            status: item.riskLevel || '정상',
-                            imageUrl: item.thumbnail
-                        })),
-                        ...melonChart.slice(0, 50).map((item, i) => ({
-                            rank: i + 51,
-                            title: item.title || '제목 없음',
-                            artist: item.artist || '-',
-                            views: item.views || '0K',
-                            risk: Math.min(100, item.suspicionScore || 0),
-                            status: item.riskLevel || '정상',
-                            imageUrl: item.thumbnail || ''
-                        }))
-                    ];
-
-                    updateStats();
-                    generateTop10();
-                    generateRest90();
-                    generateTable();
-                }
-            } catch (error) {
-                console.error('API 오류:', error);
-                generateDummyData();
-            }
-        }
-
-        function generateDummyData() {
-            const songNames = [
-                { title: 'BANG BANG', artist: 'IVE' },
-                { title: 'BLACKHOLE', artist: 'IVE' },
-                { title: '신곡 A', artist: 'Artist B' },
-                { title: '신곡 C', artist: 'Artist D' },
-                { title: '신곡 E', artist: 'Artist F' },
-                { title: '신곡 G', artist: 'Artist H' },
-                { title: '신곡 I', artist: 'Artist J' },
-                { title: '신곡 K', artist: 'Artist L' },
-                { title: '신곡 M', artist: 'Artist N' },
-                { title: '신곡 O', artist: 'Artist P' }
-            ];
-
-            TOP_100 = [];
-            for (let i = 1; i <= 100; i++) {
-                const risk = i <= 10 ? (i === 1 || i === 2 ? 55 : Math.floor(Math.random() * 40 + 5)) : Math.floor(Math.random() * 60 + 1);
-                TOP_100.push({
-                    rank: i,
-                    title: i <= 10 ? songNames[i - 1].title : `곡 ${i}`,
-                    artist: i <= 10 ? songNames[i - 1].artist : `아티스트 ${String.fromCharCode(64 + (i % 26) + 1)}`,
-                    views: Math.floor(Math.random() * 9000 + 100) + 'K',
-                    risk: risk,
-                    status: risk > 50 ? '의심' : risk > 30 ? '주의' : '정상',
-                    imageUrl: ''
-                });
-            }
-
-            updateStats();
-            generateTop10();
-            generateRest90();
-            generateTable();
-        }
-
-        function updateStats() {
-            if (TOP_100.length > 0) {
-                document.getElementById('stat1').textContent = TOP_100[0].title;
-                document.getElementById('stat1-desc').textContent = TOP_100[0].artist;
-                document.getElementById('stat2').textContent = TOP_100[1]?.title || '-';
-                document.getElementById('stat2-desc').textContent = TOP_100[1]?.artist || '-';
-                
-                const dangerCount = TOP_100.filter(s => s.risk > 50).length;
-                document.getElementById('stat3').textContent = dangerCount;
-                
-                const now = new Date();
-                document.getElementById('stat4').textContent = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-                document.getElementById('stat4-desc').textContent = now.toLocaleDateString('ko-KR');
-            }
-        }
-
-        function generateTop10() {
-            const grid = document.getElementById('top10Grid');
-            grid.innerHTML = TOP_100.slice(0, 10).map(song => `
-                <div class="top-10-item">
-                    <div class="top-10-rank">${song.rank}.</div>
-                    <div class="top-10-title">${song.title}</div>
-                    <div class="top-10-desc">${song.artist}</div>
-                </div>
-            `).join('');
-        }
-
-        function generateRest90() {
-            const restItems = document.getElementById('restItems');
-            restItems.innerHTML = TOP_100.slice(10, 100).map(song => `
-                <div class="rest-item"><span class="rest-item-rank">${song.rank}.</span>${song.title}</div>
-            `).join('');
-        }
-
-        function generateTable() {
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = TOP_100.map(song => {
-                const riskClass = song.risk > 50 ? 'status-danger' : song.risk > 30 ? 'status-warning' : 'status-normal';
-                const statusIcon = song.status === '정상' ? '✓' : song.status === '주의' ? '⚡' : '⚠️';
-
-                return `
+    <!-- Full Table -->
+    <div class="tbl-wrap">
+        <div class="sec-hdr">상세 테이블</div>
+        <div class="tbl-inner">
+            <table>
+                <thead>
                     <tr>
-                        <td class="rank-col">${song.rank}</td>
-                        <td>${song.title}</td>
-                        <td>${song.artist}</td>
-                        <td>${song.views}</td>
-                        <td class="${riskClass}">${song.risk}%</td>
-                        <td><span class="${riskClass}">${statusIcon} ${song.status}</span></td>
+                        <th style="width:36px">#</th>
+                        <th style="width:52px">변동</th>
+                        <th>곡명</th>
+                        <th class="th-sort" data-col="views"    onclick="sortTable(this)" style="width:100px">조회수 <span class="sort-ico">↕</span></th>
+                        <th class="th-sort" data-col="likeRate" onclick="sortTable(this)" style="width:80px">좋아요율 <span class="sort-ico">↕</span></th>
+                        <th class="th-sort" data-col="cmtRate"  onclick="sortTable(this)" style="width:80px">댓글율 <span class="sort-ico">↕</span></th>
+                        <th class="th-sort" data-col="risk"     onclick="sortTable(this)" style="width:90px">위험도 <span class="sort-ico">↕</span></th>
+                        <th style="width:90px">참여도</th>
                     </tr>
-                `;
-            }).join('');
-        }
+                </thead>
+                <tbody id="tbody"></tbody>
+            </table>
+        </div>
+    </div>
 
-        function acceptDisclaimer() {
-            document.getElementById('disclaimerPopup').classList.add('hidden');
-            document.getElementById('mainContent').style.display = 'block';
-            localStorage.setItem('disclaimerAccepted', Date.now().toString());
-            
-            fetchData();
-        }
+</div>
+</div>
 
-        function rejectDisclaimer() {
-            alert('이 서비스를 이용하려면 약관에 동의해야 합니다.');
-        }
+<script>
+// ─── CONFIG ────────────────────────────────────────────────────────────
+// ── API 프록시 (Vercel 서버리스 — 키 노출 없음) ──
+const BACKEND_URL = '/api/youtube';
+// API_KEY는 서버에만 존재 — 클라이언트 코드에 절대 노출 안 됨
 
-        window.addEventListener('DOMContentLoaded', function() {
-            const accepted = localStorage.getItem('disclaimerAccepted');
-            if (accepted) {
-                const lastTime = parseInt(accepted);
-                const now = Date.now();
-                const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-                
-                if (now - lastTime < thirtyDaysMs) {
-                    acceptDisclaimer();
-                    return;
+// ─── 할당량 계산 (TOP 50 기준) ────────────────────────────────────────
+// Stats  12초마다 × 7,200회/일 = 7,200유닛
+// Search 48초마다 × 1,800회/일 = 1,800유닛
+// 합계: 9,000유닛/일 ✅
+const SCHEDULE = {
+    SEARCH_INTERVAL_SEC : 48,   // 48초마다 — 썸네일/곡목록 갱신
+    STATS_INTERVAL_SEC  : 12,   // 12초마다 — 조회수/순위/위험도 갱신
+};
+
+const EMOJIS  = ['🎵','🎶','🎸','🎹','🥁','🎺','🎻','🪗','🎤','🎧'];
+const YT_BASE = 'https://www.googleapis.com/youtube/v3';
+
+let TOP_50   = [];   // 현재 순위 (실제 API 데이터만)
+let PREV_50  = [];   // 이전 순위 (변동 감지용)
+let FILTERED = [];
+let currentFilter = 'all';
+let charts = {};
+let totalChanges = 0;
+let isDemo = false;  // 백엔드 프록시 사용 — 항상 live 모드
+
+// 스케줄러 상태
+let uiTicker    = null;
+let statsTimer  = null;
+let searchTimer = null;
+
+// 각 타이머의 남은 시간 (초)
+let statsCountdown  = SCHEDULE.STATS_INTERVAL_SEC;
+let searchCountdown = SCHEDULE.SEARCH_INTERVAL_SEC;
+
+// 캐시: Search로 얻은 video ID + 썸네일 목록 유지
+let cachedVideoIds = [];
+
+// ─── 순위 히스토리 (스파크라인용) ─────────────────────────────────────
+// key: song title  /  value: number[]  (최근 10회 순위, 오래된 것 → 최신 순)
+const RANK_HISTORY = new Map();
+const SPARK_MAX_POINTS = 10;
+
+function recordRankHistory() {
+    TOP_50.forEach(s => {
+        const key  = s.title;
+        const hist = RANK_HISTORY.get(key) || [];
+        hist.push(s.rank);
+        // 최대 10개만 보관
+        if (hist.length > SPARK_MAX_POINTS) hist.shift();
+        RANK_HISTORY.set(key, hist);
+    });
+}
+
+// ─── SVG 스파크라인 생성 ───────────────────────────────────────────────
+// history: number[] (순위, 낮을수록 좋음)
+// w, h: SVG 크기 (px)
+function buildSparkSVG(history, w = 72, h = 22) {
+    if (!history || history.length < 1) return '';
+    // 데이터 1개면 수평선으로 표시
+    if (history.length === 1) {
+        const col = '#3d4a5c';
+        return `<div class="spark-wrap"><svg width="${w}" height="${h}" style="display:block">
+            <line x1="4" y1="${h/2}" x2="${w-4}" y2="${h/2}" stroke="${col}" stroke-width="1.5" stroke-dasharray="3,2" opacity=".5"/>
+        </svg><span class="spark-lbl" style="color:${col}">—</span></div>`;
+    }
+
+    const pts = history;
+    const minR = Math.min(...pts);
+    const maxR = Math.max(...pts);
+    const range = maxR - minR || 1;
+
+    // 순위는 낮을수록 좋으므로 y축 반전
+    const toY = r => h - ((maxR - r) / range) * (h - 4) - 2;
+    const toX = (i) => (i / (pts.length - 1)) * w;
+
+    const points = pts.map((r, i) => [toX(i), toY(r)]);
+
+    // polyline path
+    const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+
+    // 트렌드 판단: 처음 절반 평균 vs 후반 절반 평균
+    const half  = Math.floor(pts.length / 2);
+    const avgOld = pts.slice(0, half).reduce((a, b) => a + b, 0) / half;
+    const avgNew = pts.slice(half).reduce((a, b) => a + b, 0) / (pts.length - half);
+    // 순위 낮아지면(숫자 커지면) 하락, 높아지면(숫자 작아지면) 상승
+    const diff   = avgOld - avgNew;  // 양수 = 상승, 음수 = 하락
+    const trend  = diff > 1 ? 'up' : diff < -1 ? 'down' : 'flat';
+
+    const color  = trend === 'up'   ? '#34d399'
+                 : trend === 'down' ? '#ff4560'
+                 :                    '#3d4a5c';
+
+    // 마지막 포인트 강조 dot
+    const last   = points[points.length - 1];
+    const dotSVG = `<circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2" fill="${color}" opacity=".9"/>`;
+
+    // 영역 채우기 (아주 옅게)
+    const areaD  = `${d} L${(w).toFixed(1)},${h} L0,${h} Z`;
+
+    const trendTxt = trend === 'up'   ? `▲ 상승`
+                   : trend === 'down' ? `▼ 하락`
+                   :                    `─ 유지`;
+    const trendCol = color;
+
+    return `
+        <div class="spark-wrap">
+            <svg class="spark-svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+                <path d="${areaD}" fill="${color}" opacity=".06"/>
+                <path d="${d}" class="spark-line" stroke="${color}"/>
+                ${dotSVG}
+            </svg>
+            <div class="spark-lbl">
+                <span>${pts.length}회 기록</span>
+                <span class="spark-lbl-trend" style="color:${trendCol}">${trendTxt}</span>
+            </div>
+        </div>`;
+}
+
+// ─── 추천 채널 (왼쪽 패널) ───────────────────────────────────────────
+const REC_CHANNELS = [
+    // Yonko: 앨범 플레이리스트 ID로 채널 조회
+    { name:'YONKO',        desc:'인디 R&B',    handle:'YONKO',     chanId:'UC0cxygyqJF7Z5FBpox-MS3g', playlistId:null, color:'#34d399', init:'YK',  chanUrl:'https://www.youtube.com/channel/UC0cxygyqJF7Z5FBpox-MS3g' },
+    { name:'설레게 (SRG)', desc:'팝레게 듀오', handle:'SRG_official_', chanId:null, playlistId:null, color:'#f59e0b', init:'SRG', chanUrl:'https://www.youtube.com/@SRG_official_' },
+    { name:'PLZY 플리지',  desc:'K-인디 플리', handle:'PLZYplaycrazy', chanId:null, playlistId:null, color:'#a78bfa', init:'PL',  chanUrl:'https://www.youtube.com/@PLZYplaycrazy' },
+    { name:'KOCA TV',      desc:'K-뮤직 차트', handle:'KOCA_TV',       chanId:null, playlistId:null, color:'#5878ff', init:'KC',  chanUrl:'https://www.youtube.com/@KOCA_TV' },
+];
+
+// 각 채널의 영상 풀 캐시
+const REC_VIDEOS = {};       // key: handle → [{id, title, thumb}]
+const REC_CHAN_IDS = {};     // key: handle → channelId
+
+let recOpen         = false;
+let recShuffleTimer = null;
+let recShuffleLeft  = 15;
+const REC_SHUFFLE_SEC = 15;
+let recOrder        = [0, 1, 2, 3];
+const REC_VID_OFFSET = { 0:0, 1:0, 2:0, 3:0 };
+
+// ── Step 1: 핸들 → 채널 ID 조회 ──────────────────────────────────────
+async function getChannelId(handle) {
+    try {
+        const res = await fetch(`${BACKEND_URL}?channel=${handle}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.channelId || null;  // 백엔드가 { channelId, videos } 반환
+    } catch(e) { return null; }
+}
+
+// ── Step 2: 채널 최신 영상 6개 로드 ──────────────────────────────────
+// ── 채널 ID → uploads playlist ID 변환 (UC... → UU...) ────────────────
+function uploadsPlaylistId(channelId) {
+    return channelId.replace(/^UC/, 'UU');
+}
+
+// ── playlistItems API로 최신 영상 가져오기 (1유닛, 안정적) ─────────────
+async function fetchUploads(channelId, maxResults = 10) {
+    const uploadsId = channelId.replace(/^UC/, 'UU');
+    const res = await fetch(
+        `${BACKEND_URL}?uploadsPlaylist=${uploadsId}&maxResults=${maxResults}`
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    // 백엔드가 { videos: [...] } 반환
+    return (data.videos || []);
+}
+
+async function loadRecVideos() {
+    document.getElementById('recShuffleInfo').textContent = '영상 로딩 중...';
+    renderRecPanel(); // 스켈레톤 먼저
+
+    for (const ch of REC_CHANNELS) {
+        try {
+            // ── Step 1: 채널 ID 확보 ─────────────────────────────────────
+            let channelId = ch.chanId; // 직접 지정된 ID 있으면 바로 사용
+
+            if (!channelId) {
+                if (ch.playlistId) {
+                    // 앨범/플레이리스트 ID → 채널 ID 조회 (YONKO 등)
+                    const plRes = await fetch(
+                        `${BACKEND_URL}?playlist=${ch.playlistId}`
+                    );
+                    const plData = await plRes.json();
+                    channelId = plData.items?.[0]?.snippet?.channelId || null;
+                    console.log(`[REC] ${ch.name} playlist→channelId:`, channelId);
+                } else {
+                    // @핸들 → 채널 ID 조회 (설레게, PLZY, KOCA TV)
+                    channelId = await getChannelId(ch.handle);
+                    console.log(`[REC] ${ch.name} handle→channelId:`, channelId);
                 }
             }
 
-            document.getElementById('disclaimerPopup').classList.remove('hidden');
-        });
-    </script>
+            if (!channelId) {
+                console.warn(`[REC] ❌ 채널 ID 못찾음: ${ch.name}`);
+                renderRecPanel();
+                continue;
+            }
+            REC_CHAN_IDS[ch.handle] = channelId;
 
+            // ── Step 2: uploads playlist로 영상 가져오기 (1유닛) ─────────
+            const videos = await fetchUploads(channelId, 10);
+            if (videos.length) {
+                REC_VIDEOS[ch.handle] = videos;
+                console.log(`[REC] ✅ ${ch.name}: ${videos.length}개 로드`);
+            } else {
+                console.warn(`[REC] ⚠️ ${ch.name}: 영상 0개`);
+            }
+
+        } catch(e) {
+            console.error(`[REC] 💥 로드 실패: ${ch.name}`, e);
+        }
+
+        // 채널 하나 로드될 때마다 즉시 렌더 (스켈레톤 → 실제 썸네일)
+        renderRecPanel();
+    }
+
+    document.getElementById('recShuffleInfo').textContent = `${REC_SHUFFLE_SEC}초마다 랜덤 교체`;
+    startRecShuffle();
+}
+
+// ── 토글 ────────────────────────────────────────────────────────────────
+function toggleRec() {
+    recOpen = !recOpen;
+    const panel  = document.getElementById('recPanel');
+    const toggle = document.getElementById('recToggle');
+    const dim    = document.getElementById('recDim');
+    panel.classList.toggle('show', recOpen);
+    dim.classList.toggle('show', recOpen);
+    toggle.style.visibility    = recOpen ? 'hidden' : 'visible';
+    toggle.style.opacity       = recOpen ? '0' : '1';
+    toggle.style.pointerEvents = recOpen ? 'none' : 'auto';
+}
+
+// ── 셔플 — 15초마다 각 카드의 표시 영상을 랜덤 교체 ─────────────────
+function startRecShuffle() {
+    clearInterval(recShuffleTimer);
+    recShuffleLeft = REC_SHUFFLE_SEC;
+    updateShuffleBar();
+
+    recShuffleTimer = setInterval(() => {
+        recShuffleLeft--;
+        updateShuffleBar();
+        if (recShuffleLeft <= 0) {
+            recShuffleLeft = REC_SHUFFLE_SEC;
+            // 카드 순서 셔플 + 각 채널의 표시 영상 랜덤 교체
+            shuffleRecOrder();
+            randomizeVidOffsets();
+            renderRecPanel();
+        }
+    }, 1000);
+}
+
+function shuffleRecOrder() {
+    const arr = [0, 1, 2, 3];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    recOrder = arr;
+}
+
+function randomizeVidOffsets() {
+    recOrder.forEach(idx => {
+        const vids = REC_VIDEOS[REC_CHANNELS[idx].handle] || [];
+        // 2개 표시하므로 마지막 2개 짤리지 않게 범위 제한
+        if (vids.length > 2) {
+            REC_VID_OFFSET[idx] = Math.floor(Math.random() * (vids.length - 1));
+        }
+    });
+}
+
+function updateShuffleBar() {
+    const fill = document.getElementById('recShuffleFill');
+    if (fill) fill.style.width = `${(recShuffleLeft / REC_SHUFFLE_SEC) * 100}%`;
+}
+
+// ── 렌더 ────────────────────────────────────────────────────────────────
+function renderRecPanel() {
+    const body = document.getElementById('recBody');
+    if (!body) return;
+
+    body.innerHTML = recOrder.map((idx, cardIdx) => {
+        const ch    = REC_CHANNELS[idx];
+        const pool  = REC_VIDEOS[ch.handle] || [];
+        const offset = REC_VID_OFFSET[idx] || 0;
+        const vids   = pool.length ? pool.slice(offset, offset + 2) : [];
+
+        const vidsHtml = vids.length
+            ? vids.map(v => {
+                const safeTitle = (v.title||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+                const shortTitle = v.title.length > 45 ? v.title.slice(0,45)+'…' : v.title;
+                return `
+                <a class="rec-vid" href="https://www.youtube.com/watch?v=${v.id}"
+                   target="_blank" rel="noopener">
+                    ${v.thumb
+                        ? `<img src="${v.thumb}" alt="${safeTitle}" loading="lazy"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+                           ><div class="rec-vid-ph" style="display:none">🎵</div>`
+                        : `<div class="rec-vid-ph">🎵</div>`}
+                    <div class="rec-vid-overlay">
+                        <div class="rec-vid-title">${shortTitle}</div>
+                    </div>
+                </a>`;
+            }).join('')
+            : [0,1].map(() => `<div class="rec-skeleton"></div>`).join('');
+
+        return `
+        <div class="rec-ch-card" style="animation-delay:${cardIdx * 0.07}s">
+            <a class="rec-ch-hdr" href="${ch.chanUrl}" target="_blank" rel="noopener">
+                <div class="rec-ch-ico" style="background:${ch.color}22;border:1.5px solid ${ch.color}44;color:${ch.color}">${ch.init}</div>
+                <div>
+                    <div class="rec-ch-name">${ch.name}</div>
+                    <div class="rec-ch-sub">${ch.desc}</div>
+                </div>
+                <span class="rec-ch-arr" style="font-size:15px;color:${ch.color}">↗</span>
+            </a>
+            <div class="rec-vids">${vidsHtml}</div>
+        </div>`;
+    }).join('');
+}
+
+// ─── DISCLAIMER ────────────────────────────────────────────────────────
+function acceptDl() {
+    document.getElementById('dlPopup').classList.add('hidden');
+    document.getElementById('app').style.display = 'block';
+    try { localStorage.setItem('dlAcc', Date.now()); } catch(e) {}
+    startApp();
+}
+function denyDl() { alert('서비스를 이용하려면 약관에 동의해야 합니다.'); }
+
+// ─── TOAST ─────────────────────────────────────────────────────────────
+let _toastTimer;
+function toast(msg, type='') {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.className = 'show' + (type ? ' '+type : '');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.className = '', 3200);
+}
+
+// ─── RANK ALERT ────────────────────────────────────────────────────────
+let _alertTimer;
+function showRankAlert(changes) {
+    if (!changes.length) return;
+    const el  = document.getElementById('rankAlert');
+    const body = document.getElementById('rankAlertBody');
+    body.innerHTML = changes.slice(0,5).map(c => {
+        const thumb = c.thumb ? `<img class="rc-thumb" src="${c.thumb}" onerror="this.style.display='none'">` : `<div class="rc-thumb" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#1a2035">${c.emoji||'🎵'}</div>`;
+        let arrow = '', cls = '';
+        if (c.diff === 'new')      { arrow = 'NEW'; cls = 'rc-new'; }
+        else if (c.diff === 'out') { arrow = 'OUT'; cls = 'rc-down'; }
+        else if (c.diff > 0)       { arrow = `▲${c.diff}`; cls = 'rc-up'; }
+        else if (c.diff < 0)       { arrow = `▼${Math.abs(c.diff)}`; cls = 'rc-down'; }
+        else                       { arrow = '─'; cls = ''; }
+        return `<div class="rank-change-item">${thumb}<span class="rc-title">${c.title}</span><span class="${cls}">${arrow}</span></div>`;
+    }).join('');
+    el.classList.add('show');
+    clearTimeout(_alertTimer);
+    _alertTimer = setTimeout(() => el.classList.remove('show'), 6000);
+}
+
+// ─── COUNTDOWN RING ────────────────────────────────────────────────────
+// ─── START ─────────────────────────────────────────────────────────────
+async function startApp() {
+    isDemo = false;
+    document.getElementById('modeBadge').textContent = 'YouTube API';
+
+    // 스켈레톤 먼저 그리고 API로 영상 로드
+    renderRecPanel();
+    loadRecVideos();  // 비동기 — 메인 로딩과 병렬
+
+
+    await runSearch();
+    await runStats();
+    startScheduler();
+}
+
+function showNoApiMsg() {
+    const grid = document.getElementById('cardsGrid');
+    grid.innerHTML = `
+        <div style="grid-column:1/-1;text-align:center;padding:60px 20px;">
+            <div style="font-size:48px;margin-bottom:16px">🔑</div>
+            <div style="font-family:var(--mono);font-size:16px;color:var(--acc);margin-bottom:12px">YouTube API 키가 필요합니다</div>
+            <div style="font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.8">
+                HTML 파일에서 이 줄을 찾아 API 키를 입력하세요:<br><br>
+                <span style="background:var(--bg3);padding:8px 14px;border-radius:6px;color:var(--text);display:inline-block">
+                    const API_KEY = window.YT_API_KEY || '<b style="color:var(--warn)">여기에 키 입력</b>';
+                </span>
+            </div>
+        </div>`;
+    document.getElementById('tbody').innerHTML =
+        `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:40px;font-family:var(--mono)">API 키를 입력하면 실제 데이터가 표시됩니다</td></tr>`;
+}
+
+// ─── 2-TIER SCHEDULER ──────────────────────────────────────────────────
+function startScheduler() {
+    statsCountdown  = SCHEDULE.STATS_INTERVAL_SEC;
+    searchCountdown = SCHEDULE.SEARCH_INTERVAL_SEC;
+    updateTimerUI();
+
+    clearInterval(uiTicker);
+    uiTicker = setInterval(async () => {
+        statsCountdown--;
+        searchCountdown--;
+        updateTimerUI();
+
+        // Stats 갱신 (12초마다)
+        if (statsCountdown <= 0) {
+            statsCountdown = SCHEDULE.STATS_INTERVAL_SEC;
+            await runStats();
+        }
+
+        // Search 갱신 (48초마다)
+        if (searchCountdown <= 0) {
+            searchCountdown = SCHEDULE.SEARCH_INTERVAL_SEC;
+            await runSearch();
+            await runStats();
+        }
+    }, 1000);
+}
+
+function updateTimerUI() {
+    // 메인 링: stats 카운트다운 (12초 기준)
+    const circumference = 94.2;
+    const offset = circumference - (statsCountdown / SCHEDULE.STATS_INTERVAL_SEC) * circumference;
+    document.getElementById('ringFill').style.strokeDashoffset = offset;
+    document.getElementById('countNum').textContent = `${statsCountdown}s`;
+
+    // search 배지
+    document.getElementById('searchCountBadge').textContent = `🔍 ${searchCountdown}s`;
+}
+
+// ─── TIER 1: SEARCH (72분) — KR 공식차트 TOP 50 갱신 ─────────────────
+async function runSearch() {
+    try {
+        // 백엔드 프록시 호출 — API 키 서버에서 처리
+        const res = await fetch(BACKEND_URL);
+        if (!res.ok) throw new Error(`서버 오류 ${res.status}`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        PREV_50 = [...TOP_50];
+
+        TOP_50 = (data.chart || []).map((item, idx) => ({
+            id:       item.videoId || '',
+            title:    (item.title || '').substring(0, 42),
+            artist:   item.channel || '',
+            rank:     item.rank || idx + 1,
+            emoji:    EMOJIS[idx % EMOJIS.length],
+            views:    item.views    || 0,
+            likes:    item.likes    || 0,
+            comments: item.comments || 0,
+            viewsRaw: item.views    || 0,
+            thumb:    item.thumbnail || null,
+            risk:     item.risk || 1,   // 서버에서 계산된 값 사용 (Math.random 없음)
+            status:   riskStatus(item.risk || 1),
+            _rankDiff: 0,
+            _changed:  false,
+        }));
+
+        toast(`🔍 KR TOP 30 갱신 완료`, 'ok');
+    } catch(e) {
+        toast(`⚠ API 오류: ${e.message}`, 'err');
+    }
+}
+
+// ─── STATS 업데이트 (runSearch 후 변동 감지 + UI 갱신) ───────────────
+async function runStats() {
+    if (!TOP_50.length) return;
+    try {
+        const changes = detectChanges(PREV_50, TOP_50);
+        changes.forEach(c => {
+            const item = TOP_50.find(s => s.title === c.title);
+            if (item) { item._rankDiff = c.diff; item._changed = true; }
+        });
+        finishUpdate(changes);
+    } catch(e) {
+        console.error('runStats 오류:', e);
+    }
+}
+
+// ─── FINISH UPDATE (공통 후처리) ───────────────────────────────────────
+function finishUpdate(changes = []) {
+    if (changes.length && PREV_50.length > 0) {
+        totalChanges += changes.length;
+        document.getElementById('s4changes').textContent = totalChanges;
+        showRankAlert(changes);
+        changes.forEach(c => {
+            const el = document.getElementById(`card-${cssId(c.title)}`);
+            if (el) { el.classList.remove('rank-changed'); void el.offsetWidth; el.classList.add('rank-changed'); }
+        });
+    }
+    FILTERED = [...TOP_50];
+    recordRankHistory();
+    applyFilter();
+    updateStats();
+    updateFilterBadges();
+    renderCards();
+    renderTable();
+    renderCharts();
+    const now = new Date();
+    document.getElementById('s4').textContent =
+        now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+function calcRisk(v, l, c, rank) {
+    let s = 0;
+    const lr = v > 0 ? l / v : 0;   // 좋아요율
+    const cr = l > 0 ? c / l : 0;   // 댓글율
+
+    // 좋아요율 이상 — 낮을수록 의심 (봇 조회는 좋아요 안 누름)
+    if      (lr < 0.005) s += 40;
+    else if (lr < 0.01)  s += 28;
+    else if (lr < 0.02)  s += 16;
+    else if (lr < 0.05)  s += 6;
+
+    // 댓글율 이상 — 낮을수록 의심
+    if      (cr < 0.001) s += 25;
+    else if (cr < 0.003) s += 14;
+    else if (cr < 0.01)  s += 6;
+
+    // 상위권 진입 가산 (1위면 +15, 10위면 +0)
+    s += Math.max(0, Math.round(16 - rank * 1.4));
+
+    // 조회수 규모 대비 좋아요 절대량 이상
+    // ex) 조회수 10M인데 좋아요 5000개면 의심
+    if (v > 1_000_000 && l < 5000)  s += 20;
+    else if (v > 500_000 && l < 2000) s += 15;
+
+    return Math.min(99, Math.max(1, s));
+}
+
+// ─── CHANGE DETECTION ──────────────────────────────────────────────────
+function detectChanges(prev, curr) {
+    if (!prev.length) return [];
+    const prevMap = {};
+    prev.forEach(s => prevMap[s.title] = s.rank);
+    const changes = [];
+    curr.slice(0, 30).forEach(s => {
+        const prevRank = prevMap[s.title];
+        if (prevRank === undefined) {
+            changes.push({ ...s, diff: 'new' });
+        } else {
+            const diff = prevRank - s.rank; // positive = moved up
+            if (Math.abs(diff) >= 2) changes.push({ ...s, diff });
+        }
+    });
+    // Check for songs that dropped out of top 30
+    prev.slice(0, 30).forEach(s => {
+        const currIdx = curr.findIndex(c => c.title === s.title);
+        if (currIdx === -1 || currIdx >= 30) changes.push({ ...s, diff: 'out' });
+    });
+    return changes.slice(0, 8);
+}
+
+// ─── HELPERS ───────────────────────────────────────────────────────────
+function riskStatus(r) { return r > 50 ? '의심' : r > 30 ? '주의' : '정상'; }
+function riskRingCls(r) { return r > 50 ? 'risk-d' : r > 30 ? 'risk-w' : 'risk-k'; }
+function riskFillCls(r) { return r > 50 ? 'crf-d' : r > 30 ? 'crf-w' : 'crf-k'; }
+function statusCls(s)   { return s === '의심' ? 'sd' : s === '주의' ? 'sw' : 'sk'; }
+function statusIco(s)   { return s === '의심' ? '⚠️' : s === '주의' ? '⚡' : '✓'; }
+function fmtNum(n) {
+    if (n >= 1e9) return (n/1e9).toFixed(1)+'B';
+    if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+    if (n >= 1e3) return (n/1e3).toFixed(0)+'K';
+    return String(n);
+}
+function cssId(s) { return s.replace(/[^a-zA-Z0-9]/g,'_'); }
+
+// ─── STATS ─────────────────────────────────────────────────────────────
+function updateStats() {
+    if (!TOP_50.length) return;
+    const t = TOP_50[0];
+    document.getElementById('s1').textContent = t.title;
+    document.getElementById('s1d').textContent = t.artist;
+    document.getElementById('s2').textContent = fmtNum(t.viewsRaw || t.views || 0);
+    const suspectCount = TOP_50.filter(s => s.risk > 50).length;
+    document.getElementById('s3').textContent = suspectCount;
+    // 탭 타이틀 동적 업데이트
+    const titleShort = t.title.length > 20 ? t.title.slice(0,20)+'…' : t.title;
+    document.title = suspectCount > 0
+        ? `⚠ ${suspectCount}건 의심 | 1위: ${titleShort} — K-Music Monitor`
+        : `✓ 정상 | 1위: ${titleShort} — K-Music Monitor`;
+}
+
+// ─── FILTER BADGES ─────────────────────────────────────────────────────
+function updateFilterBadges() {
+    const counts = {
+        all:     TOP_50.length,
+        danger:  TOP_50.filter(s => s.risk > 50).length,
+        warn:    TOP_50.filter(s => s.risk > 30 && s.risk <= 50).length,
+        ok:      TOP_50.filter(s => s.risk <= 30).length,
+        changed: TOP_50.filter(s => s._changed).length,
+    };
+
+    Object.entries(counts).forEach(([key, val]) => {
+        const el = document.getElementById(`fbadge-${key}`);
+        if (!el) return;
+        const prev = el.textContent;
+        el.textContent = val;
+        // 숫자 바뀌면 pop 애니메이션
+        if (prev !== String(val) && prev !== '—') {
+            el.classList.remove('updated');
+            void el.offsetWidth;            // reflow — 애니메이션 재시작
+            el.classList.add('updated');
+        }
+    });
+}
+
+// ─── FILTER ────────────────────────────────────────────────────────────
+function setFilter(btn, val) {
+    currentFilter = val;
+    document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyFilter();
+}
+
+function applyFilter() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    FILTERED = TOP_50.filter(s => {
+        const ms = !q || s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q);
+        const mf = currentFilter === 'all'
+            || (currentFilter === 'danger'  && s.risk > 50)
+            || (currentFilter === 'warn'    && s.risk > 30 && s.risk <= 50)
+            || (currentFilter === 'ok'      && s.risk <= 30)
+            || (currentFilter === 'changed' && s._changed);
+        return ms && mf;
+    });
+
+    // 검색 결과 수 업데이트
+    const sc = document.getElementById('searchCount');
+    if (sc) {
+        sc.textContent = `${FILTERED.length}곡`;
+        sc.classList.toggle('has-results', q.length > 0 && FILTERED.length < TOP_50.length);
+    }
+
+    renderCards(true);
+    renderTable(true);
+}
+
+// ─── CARDS ─────────────────────────────────────────────────────────────
+function renderCards(filtered = false) {
+    const src = filtered ? FILTERED : TOP_50;
+    const grid = document.getElementById('cardsGrid');
+    if (!src.length) { grid.innerHTML = `<div class="no-results" style="grid-column:1/-1">검색 결과 없음</div>`; return; }
+
+    grid.innerHTML = src.map(s => {
+        const url = s.id ? `https://www.youtube.com/watch?v=${s.id}` : '#';
+        const rc  = riskRingCls(s.risk);
+        const rfc = riskFillCls(s.risk);
+
+        const thumbHtml = s.thumb
+            ? `<img class="card-thumb" src="${s.thumb}" alt="" onerror="imgFail(this)"><div class="card-thumb-ph" style="display:none">${s.emoji||'🎵'}</div>`
+            : `<div class="card-thumb-ph">${s.emoji||'🎵'}</div>`;
+
+        // ── 순위 변동 계산 ──────────────────────────────────────────────
+        let arrowCls = 'same', arrowTxt = '─';
+        if      (s._rankDiff === 'new') { arrowCls = 'new';  arrowTxt = 'NEW'; }
+        else if (s._rankDiff === 'out') { arrowCls = 'down'; arrowTxt = 'OUT'; }
+        else if (s._rankDiff > 0)       { arrowCls = 'up';   arrowTxt = '▲' + s._rankDiff; }
+        else if (s._rankDiff < 0)       { arrowCls = 'down'; arrowTxt = '▼' + Math.abs(s._rankDiff); }
+
+        // ── border-left accent 클래스 결정 ─────────────────────────────
+        // 기준: 5위 이상 변동 = "급변동" (hot/drop)
+        //       1~4위 변동   = 일반 up/down
+        //       NEW 진입     = accent-new
+        let accentCls = '';
+        if (s._rankDiff === 'new') {
+            accentCls = 'accent-new';
+        } else if (typeof s._rankDiff === 'number') {
+            if      (s._rankDiff >= 5)  accentCls = 'accent-hot';   // 급상승 ≥5
+            else if (s._rankDiff > 0)   accentCls = 'accent-up';    // 소폭 상승
+            else if (s._rankDiff <= -5) accentCls = 'accent-drop';  // 급하락 ≤-5
+            else if (s._rankDiff < 0)   accentCls = 'accent-down';  // 소폭 하락
+        }
+
+        const rankNumCls = s.rank <= 3 ? 'card-rank-num top3' : 'card-rank-num';
+        const riskColor  = rc === 'risk-d' ? 'var(--danger)' : rc === 'risk-w' ? 'var(--warn)' : 'var(--ok)';
+
+        // ── 급변동 뱃지 (5위↑ 상승/하락에만 표시) ──────────────────────
+        let hotBadge = '';
+        if (s._rankDiff >= 5) {
+            hotBadge = `<span style="
+                font-family:var(--mono); font-size:8px; font-weight:500;
+                color:var(--ok); background:rgba(52,211,153,.1);
+                border:1px solid rgba(52,211,153,.2);
+                border-radius:3px; padding:1px 5px; letter-spacing:.04em;
+            ">HOT</span>`;
+        } else if (s._rankDiff <= -5) {
+            hotBadge = `<span style="
+                font-family:var(--mono); font-size:8px; font-weight:500;
+                color:var(--danger); background:rgba(255,69,96,.1);
+                border:1px solid rgba(255,69,96,.2);
+                border-radius:3px; padding:1px 5px; letter-spacing:.04em;
+            ">DROP</span>`;
+        } else if (s._rankDiff === 'new') {
+            hotBadge = `<span style="
+                font-family:var(--mono); font-size:8px; font-weight:500;
+                color:var(--acc2); background:rgba(167,139,250,.1);
+                border:1px solid rgba(167,139,250,.2);
+                border-radius:3px; padding:1px 5px; letter-spacing:.04em;
+            ">NEW</span>`;
+        }
+
+        // ── 스파크라인 ──────────────────────────────────────────────────
+        const sparkHtml = buildSparkSVG(RANK_HISTORY.get(s.title));
+
+
+        return `<a class="song-card ${accentCls}" id="card-${cssId(s.title)}" href="${url}" target="_blank" rel="noopener">
+            <div class="card-rank-col">
+                <div class="${rankNumCls}">${s.rank}</div>
+                <div class="card-rank-arrow ${arrowCls}">${arrowTxt}</div>
+            </div>
+            <div class="card-thumb-col">${thumbHtml}</div>
+            <div class="card-info">
+                <div class="card-title">${s.title}</div>
+                <div class="card-artist">${s.artist}</div>
+                <div class="card-meta">
+                    <span class="card-views">${fmtNum(s.views||s.viewsRaw||0)}</span>
+                    <span class="card-risk-pill ${rc}">${s.risk}%</span>
+                    ${hotBadge}
+                </div>
+                ${sparkHtml}
+            </div>
+            <div class="card-risk-col">
+                <div class="card-risk-pct" style="color:${riskColor}">${s.risk}</div>
+                <div class="card-risk-bar-v"><div class="card-risk-fill-v ${rfc}" style="height:${s.risk}%"></div></div>
+            </div>
+        </a>`;
+    }).join('');
+}
+
+// ─── TABLE ─────────────────────────────────────────────────────────────
+// ─── TABLE SORT STATE ──────────────────────────────────────────────────
+let tableSort = { col: null, dir: 1 };
+let tablePage = 0;
+const TABLE_PAGE_SIZE = 25;
+
+function gotoTablePage(page) {
+    const totalPages = Math.ceil((FILTERED.length || TOP_50.length) / TABLE_PAGE_SIZE);
+    tablePage = Math.max(0, Math.min(page, totalPages - 1));
+    renderTable(FILTERED.length > 0 && FILTERED.length < TOP_50.length);
+    // 테이블 상단으로 스크롤
+    document.querySelector('.table-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}  // dir: 1=내림차순, -1=오름차순
+
+function sortTable(th) {
+    const col = th.dataset.col;
+    // 같은 컬럼 재클릭 → 방향 반전
+    if (tableSort.col === col) {
+        tableSort.dir *= -1;
+    } else {
+        tableSort.col = col;
+        tableSort.dir = -1;   // 첫 클릭 = 내림차순 (큰 값 먼저)
+    }
+    // 헤더 클래스 업데이트
+    document.querySelectorAll('.th-sort').forEach(h => {
+        h.classList.remove('asc', 'desc');
+        h.querySelector('.sort-ico').textContent = '↕';
+    });
+    th.classList.add(tableSort.dir === -1 ? 'desc' : 'asc');
+    th.querySelector('.sort-ico').textContent = '';  // CSS ::after 로 표시
+
+    renderTable(currentFilter !== 'all' || document.getElementById('searchInput').value.length > 0);
+}
+
+// ─── TABLE ─────────────────────────────────────────────────────────────
+function renderTable(filtered = false) {
+    let src = filtered ? [...FILTERED] : [...TOP_50];
+    const tbody = document.getElementById('tbody');
+    if (!src.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="no-results">검색 결과 없음</td></tr>`;
+        return;
+    }
+
+    // 정렬 적용
+    if (tableSort.col) {
+        src.sort((a, b) => {
+            let av, bv;
+            const vA = a.viewsRaw || a.views || 0;
+            const vB = b.viewsRaw || b.views || 0;
+            const lA = a.likes || 0, lB = b.likes || 0;
+            const cA = a.comments || 0, cB = b.comments || 0;
+
+            if (tableSort.col === 'views') {
+                av = vA; bv = vB;
+            } else if (tableSort.col === 'likeRate') {
+                av = vA > 0 ? lA / vA : 0;
+                bv = vB > 0 ? lB / vB : 0;
+            } else if (tableSort.col === 'cmtRate') {
+                av = lA > 0 ? cA / lA : 0;
+                bv = lB > 0 ? cB / lB : 0;
+            } else if (tableSort.col === 'risk') {
+                av = a.risk; bv = b.risk;
+            }
+            return (av - bv) * tableSort.dir;
+        });
+    }
+
+    tbody.innerHTML = src.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).map(s => {
+        const url  = s.id ? `https://www.youtube.com/watch?v=${s.id}` : '#';
+        const rc   = riskRingCls(s.risk);
+        const rCls = rc === 'risk-d' ? 'sd' : rc === 'risk-w' ? 'sw' : 'sk';
+
+        // 순위 변동 셀
+        let rankChgHtml = `<span style="color:var(--muted2)">─</span>`;
+        if      (s._rankDiff === 'new') rankChgHtml = `<span class="sk">NEW</span>`;
+        else if (s._rankDiff === 'out') rankChgHtml = `<span class="sd">OUT</span>`;
+        else if (s._rankDiff > 0)       rankChgHtml = `<span class="sk">▲${s._rankDiff}</span>`;
+        else if (s._rankDiff < 0)       rankChgHtml = `<span class="sd">▼${Math.abs(s._rankDiff)}</span>`;
+
+        // 썸네일
+        const thumbHtml = s.thumb
+            ? `<img class="s-thumb" src="${s.thumb}" alt="" onerror="imgFail(this)">
+               <div class="s-thumb-ph" style="display:none">${s.emoji||'🎵'}</div>`
+            : `<div class="s-thumb-ph">${s.emoji||'🎵'}</div>`;
+
+        // ── 좋아요율 계산 ──────────────────────────────────────────────
+        const views    = s.viewsRaw || s.views || 0;
+        const likes    = s.likes    || 0;
+        const comments = s.comments || 0;
+        const likeRate  = views > 0   ? (likes    / views   * 100) : 0;
+        const cmtRate   = likes > 0   ? (comments / likes   * 100) : 0;
+
+        // 좋아요율 등급 (업계 평균: 유튜브 뮤직 MV 기준 3~8%)
+        // 낮을수록 의심 → 빨간색
+        const lrCls = likeRate >= 5 ? 'rate-hi' : likeRate >= 2 ? 'rate-mid' : 'rate-lo';
+        // 댓글율 (likes 대비 comments) — 낮을수록 의심
+        const crCls = cmtRate >= 3  ? 'rate-hi' : cmtRate  >= 1 ? 'rate-mid' : 'rate-lo';
+
+        // ── 참여도 미니 바 차트 ────────────────────────────────────────
+        // 좋아요율 max=10%, 댓글율 max=10% 기준으로 정규화
+        const lrH  = Math.min(100, likeRate / 10 * 100);
+        const crH  = Math.min(100, cmtRate  / 10 * 100);
+        const engHtml = `
+            <div class="eng-wrap">
+                <div class="eng-bars">
+                    <div class="eng-bar eng-bar-like"    style="height:${Math.max(2,lrH)}%"></div>
+                    <div class="eng-bar eng-bar-comment" style="height:${Math.max(2,crH)}%"></div>
+                </div>
+                <div class="eng-lbl">${likeRate.toFixed(1)}% · ${cmtRate.toFixed(1)}%</div>
+            </div>`;
+
+        return `<tr>
+            <td class="trc">${s.rank}</td>
+            <td class="td-rank-chg">${rankChgHtml}</td>
+            <td>
+                <a class="song-cell" href="${url}" target="_blank" rel="noopener">
+                    ${thumbHtml}
+                    <div>
+                        <div class="s-ttl">${s.title}</div>
+                        <div class="s-art">${s.artist}</div>
+                    </div>
+                </a>
+            </td>
+            <td>
+                <div class="td-num">${fmtNum(views)}</div>
+                <div class="td-num-sub">${fmtNum(likes)} 좋아요</div>
+            </td>
+            <td class="td-num ${lrCls}" style="font-size:12px">
+                ${likeRate.toFixed(2)}%
+            </td>
+            <td class="td-num ${crCls}" style="font-size:12px">
+                ${cmtRate.toFixed(2)}%
+            </td>
+            <td>
+                <span class="${rCls}" style="font-family:var(--mono);font-size:13px;font-weight:600">${s.risk}%</span>
+            </td>
+            <td>${engHtml}</td>
+        </tr>`;
+    }).join('');
+
+    // ── 페이지네이션 컨트롤 ──────────────────────────────────────────
+    const totalPages = Math.ceil(src.length / TABLE_PAGE_SIZE);
+    let pgEl = document.getElementById('tablePager');
+    if (!pgEl) {
+        pgEl = document.createElement('div');
+        pgEl.id = 'tablePager';
+        pgEl.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 0 4px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted2);';
+        tbody.closest('table').after(pgEl);
+    }
+    if (totalPages <= 1) { pgEl.innerHTML = ''; return; }
+
+    const mkBtn = (label, page, active, disabled) => {
+        const base = `background:${active?'var(--acc)':'transparent'};border:1px solid ${active?'var(--acc)':'var(--border)'};color:${active?'#fff':'var(--muted2)'};border-radius:5px;padding:5px 11px;cursor:${disabled?'default':'pointer'};font-family:var(--mono);font-size:11px;opacity:${disabled?'.35':'1'};transition:all .15s;`;
+        return `<button style="${base}" onclick="${disabled?'':'gotoTablePage('+page+')'}">${label}</button>`;
+    };
+    pgEl.innerHTML = `
+        ${mkBtn('← 이전', tablePage-1, false, tablePage===0)}
+        ${Array.from({length:totalPages},(_,i) => mkBtn(i+1, i, i===tablePage, false)).join('')}
+        ${mkBtn('다음 →', tablePage+1, false, tablePage===totalPages-1)}
+        <span style="margin-left:4px;">${tablePage*TABLE_PAGE_SIZE+1}–${Math.min((tablePage+1)*TABLE_PAGE_SIZE,src.length)} / ${src.length}곡</span>
+    `;
+}
+
+// ─── CHARTS ────────────────────────────────────────────────────────────
+function renderCharts() {
+    Chart.defaults.color = '#8899aa';
+    Chart.defaults.font.family = "'DM Mono', monospace";
+    Chart.defaults.font.size = 12;
+    Object.values(charts).forEach(c => c.destroy());
+
+    const top10 = TOP_50.slice(0, 10);
+
+    // ── 1. 가로형 바 차트 (horizontal bar) ──────────────────────────────
+    // 곡명이 y축 왼쪽에 풀로 표시 — 잘림 없음
+    const barColors = top10.map(s =>
+        s.risk > 50 ? 'rgba(255,69,96,.7)'
+      : s.risk > 30 ? 'rgba(245,158,11,.7)'
+      :               'rgba(52,211,153,.65)'
+    );
+    const barBorders = top10.map(s =>
+        s.risk > 50 ? '#ff4560'
+      : s.risk > 30 ? '#f59e0b'
+      :               '#34d399'
+    );
+
+    charts.risk = new Chart(document.getElementById('chartRisk'), {
+        type: 'bar',
+        data: {
+            // 순위 역순 (1위가 위에 오도록)
+            labels: [...top10].reverse().map(s => {
+                const t = s.title;
+                return t.length > 22 ? t.substring(0, 22) + '…' : t;
+            }),
+            datasets: [{
+                label: '위험도 %',
+                data: [...top10].reverse().map(s => s.risk),
+                backgroundColor: [...barColors].reverse(),
+                borderColor:     [...barBorders].reverse(),
+                borderWidth: 0,
+                borderRadius: { topRight: 4, bottomRight: 4 },
+                borderSkipped: false,
+            }]
+        },
+        options: {
+            indexAxis: 'y',          // ← 핵심: 가로형으로 전환
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+                duration: 600,
+                easing: 'easeOutQuart',
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            const s = [...top10].reverse()[ctx.dataIndex];
+                            const status = s.risk > 50 ? '⚠ 의심' : s.risk > 30 ? '△ 주의' : '✓ 정상';
+                            return ` ${ctx.parsed.x}%  ${status}`;
+                        },
+                        title: ctx => {
+                            const s = [...top10].reverse()[ctx[0].dataIndex];
+                            return `#${s.rank}  ${s.title}`;
+                        }
+                    },
+                    backgroundColor: '#0c1018',
+                    borderColor: 'rgba(88,120,255,.25)',
+                    borderWidth: 1,
+                    padding: 12,
+                    titleColor: '#dde3f0',
+                    bodyColor: '#94a3b8',
+                    titleFont: { size: 12, weight: '600' },
+                    bodyFont: { size: 11 },
+                }
+            },
+            scales: {
+                x: {
+                    min: 0, max: 100,
+                    grid:  { color: 'rgba(88,120,255,.06)', drawBorder: false },
+                    ticks: {
+                        color: '#8899aa',
+                        callback: v => v + '%',
+                        maxTicksLimit: 5,
+                        font: { size: 11, weight: '500' },
+                    },
+                    border: { display: false },
+                },
+                y: {
+                    grid:  { display: false, drawBorder: false },
+                    ticks: {
+                        color: '#c0cce0',
+                        font: { size: 11, weight: '500' },
+                        callback: function(val) {
+                            return this.getLabelForValue(val);
+                        }
+                    },
+                    border: { display: false },
+                }
+            }
+        }
+    });
+
+    // ── 2. 스캐터 차트 — 포인트 크게, 의심 구역 강조 ───────────────────
+    const sc50 = TOP_50.map(s => ({
+        x: +(s.viewsRaw / 1e6).toFixed(2),
+        y: s.risk,
+        label: s.title,
+        rank: s.rank,
+    }));
+
+    // 의심 구역 배경 플러그인 (조회수 낮은데 위험도 높음)
+    const suspectZonePlugin = {
+        id: 'suspectZone',
+        beforeDraw(chart) {
+            const { ctx, chartArea, scales } = chart;
+            if (!chartArea) return;
+            const x = scales.x, y = scales.y;
+            // x < 2M && y > 50 구역 강조
+            const x2 = Math.min(x.getPixelForValue(2), chartArea.right);
+            const y50 = y.getPixelForValue(50);
+            ctx.save();
+            ctx.fillStyle = 'rgba(255,69,96,.04)';
+            ctx.fillRect(chartArea.left, chartArea.top, x2 - chartArea.left, y50 - chartArea.top);
+            // 구역 라벨
+            ctx.fillStyle = 'rgba(255,69,96,.25)';
+            ctx.font = '9px DM Mono, monospace';
+            ctx.fillText('의심 구역', chartArea.left + 5, chartArea.top + 12);
+            ctx.restore();
+        }
+    };
+
+    charts.scatter = new Chart(document.getElementById('chartScatter'), {
+        type: 'scatter',
+        plugins: [suspectZonePlugin],
+        data: {
+            datasets: [{
+                label: '곡',
+                data: sc50,
+                backgroundColor: sc50.map(d =>
+                    d.y > 50 ? 'rgba(255,69,96,.75)'
+                  : d.y > 30 ? 'rgba(245,158,11,.75)'
+                  :             'rgba(52,211,153,.65)'
+                ),
+                pointRadius: sc50.map(d => d.y > 50 ? 7 : d.y > 30 ? 5 : 4),
+                pointHoverRadius: 9,
+                borderWidth: 0,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 500 },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: c => {
+                            const d = c.raw;
+                            const status = d.y > 50 ? '⚠ 의심' : d.y > 30 ? '△ 주의' : '✓ 정상';
+                            return [
+                                ` #${d.rank}  ${d.label.substring(0,20)}`,
+                                ` 조회수 ${d.x}M  /  위험도 ${d.y}%  ${status}`
+                            ];
+                        },
+                        title: () => ''
+                    },
+                    backgroundColor: '#0c1018',
+                    borderColor: 'rgba(88,120,255,.25)',
+                    borderWidth: 1,
+                    padding: 10,
+                    bodyColor: '#94a3b8',
+                }
+            },
+            scales: {
+                x: {
+                    grid:  { color: 'rgba(88,120,255,.06)', drawBorder: false },
+                    ticks: { color: '#c8d0e0', maxTicksLimit: 6, font: { size: 11, weight: '600' }, callback: v => v + 'M' },
+                    title: { display: true, text: '조회수 (M)', color: '#dde3f0', font: { size: 13, weight: '700' }, padding: { top: 8 } },
+                    border: { display: false },
+                },
+                y: {
+                    min: 0, max: 100,
+                    grid:  { color: 'rgba(88,120,255,.06)', drawBorder: false },
+                    ticks: { color: '#c8d0e0', maxTicksLimit: 5, font: { size: 11, weight: '600' }, callback: v => v + '%' },
+                    title: { display: true, text: '위험도 (%)', color: '#dde3f0', font: { size: 13, weight: '700' }, padding: { bottom: 8 } },
+                    border: { display: false },
+                }
+            }
+        }
+    });
+
+    // ── 3. 도넛 차트 — center label ─────────────────────────────────────
+    const dCount  = TOP_50.filter(s => s.risk > 50).length;
+    const wCount  = TOP_50.filter(s => s.risk > 30 && s.risk <= 50).length;
+    const okCount = TOP_50.filter(s => s.risk <= 30).length;
+    const total   = TOP_50.length || 1;
+
+    // center label 업데이트
+    const dclNum = document.getElementById('dcl-num');
+    if (dclNum) {
+        dclNum.textContent = dCount;
+        dclNum.style.color = dCount > total * 0.3 ? 'var(--danger)' : dCount > total * 0.15 ? 'var(--warn)' : 'var(--ok)';
+    }
+
+    charts.donut = new Chart(document.getElementById('chartDonut'), {
+        type: 'doughnut',
+        data: {
+            labels: ['의심 (>50%)', '주의 (30–50%)', '정상 (≤30%)'],
+            datasets: [{
+                data: [dCount, wCount, okCount],
+                backgroundColor: [
+                    'rgba(255,69,96,.8)',
+                    'rgba(245,158,11,.75)',
+                    'rgba(52,211,153,.7)',
+                ],
+                borderColor: ['#ff4560', '#f59e0b', '#34d399'],
+                borderWidth: 1.5,
+                hoverOffset: 8,
+                spacing: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '68%',      // 더 얇게 → center label 공간 확보
+            animation: {
+                animateRotate: true,
+                duration: 700,
+                easing: 'easeOutQuart',
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#8899aa',
+                        padding: 10,
+                        font: { size: 11, weight: '500' },
+                        boxWidth: 10,
+                        boxHeight: 10,
+                        borderRadius: 3,
+                        useBorderRadius: true,
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: c => {
+                            const pct = ((c.parsed / total) * 100).toFixed(0);
+                            return `  ${c.label}: ${c.parsed}곡 (${pct}%)`;
+                        }
+                    },
+                    backgroundColor: '#0c1018',
+                    borderColor: 'rgba(88,120,255,.25)',
+                    borderWidth: 1,
+                    padding: 10,
+                    bodyColor: '#94a3b8',
+                }
+            }
+        }
+    });
+}
+
+// ─── THUMB FALLBACK ────────────────────────────────────────────────────
+const THUMB_CHAIN = ['mqdefault','hqdefault','sddefault','default'];
+
+function imgFail(img) {
+    const src = img.src || '';
+    const vidMatch = src.match(/\/vi\/([A-Za-z0-9_-]+)\//);
+    if (vidMatch) {
+        const vid = vidMatch[1];
+        const curQ = src.split('/').pop().replace('.jpg','');
+        const idx = THUMB_CHAIN.indexOf(curQ);
+        if (idx !== -1 && idx < THUMB_CHAIN.length - 1) {
+            img.onerror = function() { imgFail(this); };
+            img.src = `https://img.youtube.com/vi/${vid}/${THUMB_CHAIN[idx + 1]}.jpg`;
+            return;
+        }
+    }
+    // 모든 폴백 소진 → 부모 안의 placeholder div 표시
+    img.style.display = 'none';
+    const ph = img.parentNode && img.parentNode.querySelector('.card-thumb-ph, .s-thumb-ph, .r-thumb-ph');
+    if (ph) ph.style.display = 'flex';
+}
+
+// ─── BOOT ──────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+    let acc = false;
+    try { const t = localStorage.getItem('dlAcc'); if (t && Date.now()-parseInt(t) < 30*24*60*60*1000) acc = true; } catch(e){}
+    if (acc) acceptDl();
+});
+</script>
 </body>
 </html>
