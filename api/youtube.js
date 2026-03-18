@@ -21,14 +21,14 @@ function parseVideos(items) {
             const isForeign = /[\u0900-\u097F\u0600-\u06FF]/.test(item.snippet?.title || ''); // 힌디/아랍어
             return !isPrivate && !isShorts && !isForeign;
         })
-        .map(item => ({
-            videoId:   item.snippet.resourceId?.videoId || item.id,
-            title:     item.snippet.title,
-            thumbnail: item.snippet.thumbnails?.high?.url
-                    || item.snippet.thumbnails?.medium?.url
-                    || item.snippet.thumbnails?.default?.url
-                    || null,
-        }));
+        .map(item => {
+            const videoId = item.snippet.resourceId?.videoId || item.id;
+            return {
+                videoId,
+                title:     item.snippet.title,
+                thumbnail: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+            };
+        });
 }
 
 export default async function handler(req, res) {
@@ -96,8 +96,7 @@ export default async function handler(req, res) {
                 rank, videoId: item.id,
                 title:     item.snippet?.title || '',
                 channel:   item.snippet?.channelTitle || '',
-                thumbnail: item.snippet?.thumbnails?.medium?.url
-                        || item.snippet?.thumbnails?.default?.url || null,
+                thumbnail: `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
                 views: v, likes: l, comments: c,
                 risk: calcRisk(v, l, c, rank),
             };
